@@ -2,7 +2,17 @@ import discord
 from discord import app_commands
 import random
 import re
-from ..les_textes.remplacements_phonetiques import REMPLACEMENTS_PHONETIQUES
+import sys
+import os
+
+# Ajouter le répertoire parent au path pour permettre l'import
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+try:
+    from les_textes.remplacements_phonetiques import REMPLACEMENTS_PHONETIQUES
+except ImportError:
+    # Fallback si l'import échoue
+    from ..les_textes.remplacements_phonetiques import REMPLACEMENTS_PHONETIQUES
 
 # ID du propriétaire du bot (immunisé)
 mon_id = 784106722615754772
