@@ -109,7 +109,7 @@ async def rr(interaction: discord.Interaction, nom: str, tag: str = None, region
                             enemy_team = teams.get(enemy_team_key) or {}
                             match_score = f"{my_team.get('rounds_won', 0)}-{enemy_team.get('rounds_won', 0)}"
 
-            # 3. Construction de l'Embed
+            # 3. Construction de l'Embed et de l'Image
             is_win = (changement_rr > 0)
             result_text = "Victoire" if is_win else "Défaite" if changement_rr < 0 else "Égalité"
             color = discord.Color.green() if is_win else discord.Color.red() if changement_rr < 0 else discord.Color.dark_gray()
@@ -117,26 +117,23 @@ async def rr(interaction: discord.Interaction, nom: str, tag: str = None, region
             action_rr = "gagner" if is_win else "perdre" if changement_rr < 0 else "gagner"
             phrase_desc = f"{nom} vient de {action_rr} {abs(changement_rr)} RR ({rang} {rr_actuel} RR)"
 
+            from utils.image_generator import generate_match_image
+            buffer = generate_match_image(map_name, agent, kda, changement_rr)
+            file = discord.File(fp=buffer, filename="recap.png")
+
             embed = discord.Embed(
                 title=f"{result_text} ({match_score})",
                 description=phrase_desc,
                 color=color
             )
             embed.set_author(name=f"Statistiques de {nom}#{tag}", icon_url="https://media.valorant-api.com/gamemodes/96bd3920-4f36-d026-2b28-c683eb0bcac5/displayicon.png")
-            
-            embed.add_field(name="Score", value=kda, inline=True)
-            embed.add_field(name="Agent", value=agent, inline=True)
-            embed.add_field(name="Map", value=map_name, inline=True)
-            
-            if agent_image_url:
-                embed.set_thumbnail(url=agent_image_url)
-            
+            embed.set_image(url="attachment://recap.png")
             embed.timestamp = datetime.datetime.now()
             
             print("=== COMMANDE RR ENVOYÉE SUR DISCORD ===")
             print(json.dumps(embed.to_dict(), indent=4, ensure_ascii=False))
             
-            await interaction.followup.send(embed=embed)
+            await interaction.followup.send(embed=embed, file=file)
             
         except Exception as e:
             await interaction.followup.send(f"❌ Une erreur inattendue est survenue: {e}")

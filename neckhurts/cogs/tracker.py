@@ -5,6 +5,7 @@ import aiohttp
 import os
 import json
 import datetime
+from utils.image_generator import generate_match_image
 
 os.makedirs("data", exist_ok=True)
 DATA_FILE = "data/tracker_data.json"
@@ -202,18 +203,12 @@ def rr_progress_bar(rr: int, total: int = 100, length: int = 12) -> str:
 
 
 # ─── Construction de l'embed premium après une partie ─────────────────────────
-def build_match_embed(nom, tag, rang, rr_actuel, mmr_change, diff,
-                      agent, kda, map_name, match_score, agent_image_url,
-                      acs, hs_pct, nb_rounds):
+def build_match_embed(nom, tag, rang, mmr_change, match_score):
     # On utilise mmr_change (changement RR de la dernière game) et non diff
-    # (diff = écart ELO global depuis la dernière vérif, faussé si plusieurs games jouées)
     is_win = mmr_change > 1
     is_draw = mmr_change == 0   
     result_text = "VICTOIRE" if is_win else "DÉFAITE" if not is_draw else "ÉGALITÉ"
     color = discord.Color.from_rgb(0, 200, 120) if is_win else discord.Color.from_rgb(255, 60, 80) if not is_draw else discord.Color.from_rgb(120, 120, 120)
-
-    sign = "+" if mmr_change >= 0 else ""
-    rr_change_str = f"{sign}{mmr_change} RR"
 
     embed = discord.Embed(
         title=f"{result_text}  ·  {match_score}",
@@ -225,35 +220,7 @@ def build_match_embed(nom, tag, rang, rr_actuel, mmr_change, diff,
         icon_url=VALORANT_ICON
     )
 
-    # Miniature : portrait de l'agent en priorité, sinon icône du rang
-    rank_banner = RANK_BANNER_URLS.get(rang)
-    if agent_image_url:
-        embed.set_thumbnail(url=agent_image_url)
-    elif rank_banner:
-        embed.set_thumbnail(url=rank_banner)
-
-    # ─ Ligne 1 : Performance ─
-    embed.add_field(name="KDA", value=f"**{kda}**", inline=True)
-    embed.add_field(name="ACS", value=f"**{acs}**", inline=True)
-    embed.add_field(name="HS%", value=f"**{hs_pct}%**", inline=True)
-
-    # ─ Ligne 2 : Contexte ─
-    embed.add_field(name="Agent", value=agent, inline=True)
-    embed.add_field(name="Map", value=map_name, inline=True)
-    embed.add_field(name="Rounds", value=str(nb_rounds), inline=True)
-
-    # ─ Séparateur invisible ─
-    embed.add_field(name="\u200b", value="\u200b", inline=False)
-
-    # ─ RR — progression ─
-    rr_label = "RR Gagnés" if is_win else "RR Perdus" if not is_draw else "RR"
-    bar = rr_progress_bar(rr_actuel)
-    embed.add_field(
-        name=rr_label,
-        value=f"**{rr_change_str}**\n{bar}",
-        inline=False
-    )
-
+    embed.set_image(url="attachment://recap.png")
     embed.set_footer(text="RR Trackerito  ·  Données via HenrikDev")
     embed.timestamp = datetime.datetime.now()
     return embed
@@ -345,100 +312,168 @@ class TrackerTask:
         headers = {"Authorization": HENRIK_API_KEY}
 
         async with aiohttp.ClientSession() as session:
+            new_matches_by_id = {}
+            
             for discord_id, info in tracker_data.items():
                 if discord_id == "_meta":
                     continue
                 nom = info["nom"]
                 tag = info["tag"]
                 region = info["region"]
-                last_elo = info["last_elo"]
+                last_match_id = info.get("last_match_id")
+                last_elo = info.get("last_elo", 0)
 
-                url = f"https://api.henrikdev.xyz/valorant/v1/mmr/{region}/{nom}/{tag}"
+                match_url = f"https://api.henrikdev.xyz/valorant/v3/matches/{region}/{nom}/{tag}?size=1"
                 try:
-                    async with session.get(url, headers=headers) as response:
-                        if response.status == 200:
-                            data_api = (await response.json()).get("data", {})
-                            current_elo = data_api.get("elo", 0)
-
-                            if current_elo != last_elo and current_elo != 0 and last_elo != 0:
-                                diff = current_elo - last_elo
-                                mmr_change = data_api.get("mmr_change_to_last_game", diff)
-                                rang = data_api.get("currenttierpatched", "Inconnu")
-                                rr_actuel = data_api.get("ranking_in_tier", 0)
-
-                                # ─ Données du dernier match ─
-                                match_url = f"https://api.henrikdev.xyz/valorant/v3/matches/{region}/{nom}/{tag}?size=1"
-                                agent = "Inconnu"
-                                kda = "0/0/0"
-                                map_name = "Inconnue"
-                                match_score = "0-0"
-                                agent_image_url = None
-                                acs = 0
-                                hs_pct = 0.0
-                                nb_rounds = 0
-
-                                try:
-                                    async with session.get(match_url, headers=headers) as match_resp:
-                                        if match_resp.status == 200:
-                                            match_data = await match_resp.json()
-                                            if match_data.get("data") and len(match_data["data"]) > 0:
-                                                match = match_data["data"][0]
-                                                metadata = match.get("metadata") or {}
-                                                map_name = metadata.get("map", "Inconnue")
-                                                nb_rounds = metadata.get("rounds_played") or 0
-
-                                                players_dict = match.get("players") or {}
-                                                all_players = players_dict.get("all_players", [])
-
-                                                ps = extract_player_stats(all_players, nom, tag)
-                                                if ps:
-                                                    agent = ps["agent"]
-                                                    kda = ps["kda"]
-                                                    agent_image_url = ps["agent_image"]
-                                                    hs_pct = ps["hs_pct"]
-                                                    acs = compute_acs(ps["score_raw"], nb_rounds)
-                                                    player_team = ps.get("team")
-
-                                                    if player_team:
-                                                        teams = match.get("teams") or {}
-                                                        my_team = teams.get(player_team.lower()) or {}
-                                                        enemy_key = "blue" if player_team.lower() == "red" else "red"
-                                                        enemy_team = teams.get(enemy_key) or {}
-                                                        match_score = f"{my_team.get('rounds_won', 0)}-{enemy_team.get('rounds_won', 0)}"
-
-                                except Exception as e:
-                                    print(f"Erreur récupération match pour {nom}#{tag}: {e}")
-
-                                # ─ Embed premium ─
-                                embed = build_match_embed(
-                                    nom=nom, tag=tag, rang=rang, rr_actuel=rr_actuel,
-                                    mmr_change=mmr_change, diff=diff,
-                                    agent=agent, kda=kda, map_name=map_name,
-                                    match_score=match_score, agent_image_url=agent_image_url,
-                                    acs=acs, hs_pct=hs_pct, nb_rounds=nb_rounds
-                                )
-
-                                # ─ Bouton 5 dernières games ─
-                                view = DernieresGamesView(nom=nom, tag=tag, region=region)
-
-                                print("=== MESSAGE ENVOYÉ SUR DISCORD ===")
-                                print(json.dumps(embed.to_dict(), indent=4, ensure_ascii=False))
-
-                                if channel:
-                                    await channel.send(embed=embed, view=view)
-                                else:
-                                    user = self.client.get_user(int(discord_id))
-                                    if user:
-                                        try:
-                                            await user.send(embed=embed, view=view)
-                                        except:
-                                            pass
-
-                                tracker_data[discord_id]["last_elo"] = current_elo
-                                save_data(tracker_data)
-
+                    async with session.get(match_url, headers=headers) as match_resp:
+                        if match_resp.status == 200:
+                            match_data = await match_resp.json()
+                            if match_data.get("data") and len(match_data["data"]) > 0:
+                                match = match_data["data"][0]
+                                metadata = match.get("metadata") or {}
+                                match_id = metadata.get("matchid")
+                                
+                                if match_id:
+                                    if last_match_id is None:
+                                        tracker_data[discord_id]["last_match_id"] = match_id
+                                        save_data(tracker_data)
+                                    elif match_id != last_match_id:
+                                        mode = metadata.get("mode", "").lower()
+                                        queue = metadata.get("queue", "").lower()
+                                        if mode == "competitive" or queue == "competitive":
+                                            mmr_url = f"https://api.henrikdev.xyz/valorant/v1/mmr/{region}/{nom}/{tag}"
+                                            mmr_change = 0
+                                            rang = "Inconnu"
+                                            current_elo = last_elo
+                                            
+                                            async with session.get(mmr_url, headers=headers) as mmr_resp:
+                                                if mmr_resp.status == 200:
+                                                    data_api = (await mmr_resp.json()).get("data", {})
+                                                    mmr_change = data_api.get("mmr_change_to_last_game", 0)
+                                                    rang = data_api.get("currenttierpatched", "Inconnu")
+                                                    current_elo = data_api.get("elo", last_elo)
+                                            
+                                            if match_id not in new_matches_by_id:
+                                                new_matches_by_id[match_id] = {
+                                                    "match": match,
+                                                    "players": []
+                                                }
+                                                
+                                            new_matches_by_id[match_id]["players"].append({
+                                                "discord_id": discord_id,
+                                                "nom": nom,
+                                                "tag": tag,
+                                                "region": region,
+                                                "mmr_change": mmr_change,
+                                                "rang": rang,
+                                                "current_elo": current_elo
+                                            })
+                                        else:
+                                            tracker_data[discord_id]["last_match_id"] = match_id
+                                            save_data(tracker_data)
                 except Exception as e:
-                    print(f"Erreur Tracker pour {nom}#{tag} : {e}")
+                    print(f"Erreur vérification match pour {nom}#{tag} : {e}")
+
+            for match_id, match_info in new_matches_by_id.items():
+                match = match_info["match"]
+                involved_players = match_info["players"]
+                
+                metadata = match.get("metadata") or {}
+                map_name = metadata.get("map", "Inconnue")
+                
+                players_dict = match.get("players") or {}
+                all_players = players_dict.get("all_players", [])
+                
+                if len(involved_players) == 1:
+                    player_data = involved_players[0]
+                    nom, tag, discord_id = player_data["nom"], player_data["tag"], player_data["discord_id"]
+                    region = player_data["region"]
+                    
+                    ps = extract_player_stats(all_players, nom, tag)
+                    if ps:
+                        agent = ps["agent"]
+                        kda = ps["kda"]
+                        player_team = ps.get("team")
+                        
+                        match_score = "0-0"
+                        if player_team:
+                            teams = match.get("teams") or {}
+                            my_team = teams.get(player_team.lower()) or {}
+                            enemy_key = "blue" if player_team.lower() == "red" else "red"
+                            enemy_team = teams.get(enemy_key) or {}
+                            match_score = f"{my_team.get('rounds_won', 0)}-{enemy_team.get('rounds_won', 0)}"
+                        
+                        buffer = generate_match_image(map_name, agent, kda, player_data["mmr_change"])
+                        file = discord.File(fp=buffer, filename="recap.png")
+                        
+                        embed = build_match_embed(
+                            nom=nom, tag=tag, rang=player_data["rang"],
+                            mmr_change=player_data["mmr_change"], match_score=match_score
+                        )
+                        view = DernieresGamesView(nom=nom, tag=tag, region=region)
+                        
+                        if channel:
+                            await channel.send(embed=embed, file=file, view=view)
+                        else:
+                            user = self.client.get_user(int(discord_id))
+                            if user:
+                                try: await user.send(embed=embed, file=file, view=view)
+                                except: pass
+                                
+                    tracker_data[discord_id]["last_match_id"] = match_id
+                    tracker_data[discord_id]["last_elo"] = player_data["current_elo"]
+                    save_data(tracker_data)
+                    
+                else:
+                    p1_stats = extract_player_stats(all_players, involved_players[0]["nom"], involved_players[0]["tag"])
+                    match_score = "0-0"
+                    if p1_stats and p1_stats.get("team"):
+                        player_team = p1_stats.get("team")
+                        teams = match.get("teams") or {}
+                        my_team = teams.get(player_team.lower()) or {}
+                        enemy_key = "blue" if player_team.lower() == "red" else "red"
+                        enemy_team = teams.get(enemy_key) or {}
+                        match_score = f"{my_team.get('rounds_won', 0)}-{enemy_team.get('rounds_won', 0)}"
+                    
+                    mmr_change_p1 = involved_players[0]["mmr_change"]
+                    is_win = mmr_change_p1 > 0
+                    is_draw = mmr_change_p1 == 0
+                    result_text = "VICTOIRE" if is_win else "DÉFAITE" if not is_draw else "ÉGALITÉ"
+                    color = discord.Color.from_rgb(0, 200, 120) if is_win else discord.Color.from_rgb(255, 60, 80) if not is_draw else discord.Color.from_rgb(120, 120, 120)
+                    
+                    embed = discord.Embed(
+                        title=f"{result_text} de groupe  ·  {match_score}",
+                        description=f"Une partie groupée ({len(involved_players)} joueurs) vient de se terminer sur **{map_name}**.",
+                        color=color
+                    )
+                    
+                    for p_data in involved_players:
+                        nom, tag = p_data["nom"], p_data["tag"]
+                        ps = extract_player_stats(all_players, nom, tag)
+                        if ps:
+                            agent = ps["agent"]
+                            kda = ps["kda"]
+                            sign = "+" if p_data["mmr_change"] > 0 else ""
+                            rr_str = f"{sign}{p_data['mmr_change']} RR"
+                            embed.add_field(
+                                name=f"{nom}#{tag}  —  {p_data['rang']}",
+                                value=f"**Agent**: {agent}  |  **KDA**: {kda}  |  **{rr_str}**",
+                                inline=False
+                            )
+                        
+                        tracker_data[p_data["discord_id"]]["last_match_id"] = match_id
+                        tracker_data[p_data["discord_id"]]["last_elo"] = p_data["current_elo"]
+                        
+                    save_data(tracker_data)
+                    
+                    if channel:
+                        await channel.send(embed=embed)
+                    else:
+                        for p_data in involved_players:
+                            user = self.client.get_user(int(p_data["discord_id"]))
+                            if user:
+                                try: await user.send(embed=embed)
+                                except: pass
 
         # Rattrapage du Daily Recap si on a dépassé 9h et qu'il n'a pas été envoyé aujourd'hui
         now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=2)))
