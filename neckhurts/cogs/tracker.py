@@ -77,6 +77,8 @@ def extract_player_stats(all_players, nom, tag):
             total_shots = headshots + bodyshots + legshots
             hs_pct = round((headshots / total_shots) * 100, 1) if total_shots > 0 else 0.0
 
+            damage_made = p.get("damage_made", 0)
+            
             return {
                 "agent": p.get("character", "Inconnu"),
                 "kda": f"{kills}/{deaths}/{assists}",
@@ -87,6 +89,7 @@ def extract_player_stats(all_players, nom, tag):
                 "kills": kills,
                 "deaths": deaths,
                 "assists": assists,
+                "damage_made": damage_made,
             }
     return None
 
@@ -403,7 +406,21 @@ class TrackerTask:
                             enemy_team = teams.get(enemy_key) or {}
                             match_score = f"{my_team.get('rounds_won', 0)}-{enemy_team.get('rounds_won', 0)}"
                         
-                        buffer = await generate_match_image(map_name, agent, kda, player_data["mmr_change"])
+                        kills = ps.get("kills", 0)
+                        deaths = ps.get("deaths", 0)
+                        kd = round(kills / deaths, 2) if deaths > 0 else kills
+                        nb_rounds = sum(map(int, match_score.split('-'))) if '-' in match_score else 0
+                        acs = compute_acs(ps.get("score_raw", 0), nb_rounds)
+                        adr = round(ps.get("damage_made", 0) / nb_rounds) if nb_rounds > 0 else 0
+                        
+                        stats_dict = {
+                            "hs_pct": ps.get("hs_pct", 0),
+                            "kd": kd,
+                            "adr": adr,
+                            "acs": acs
+                        }
+                        
+                        buffer = await generate_match_image(map_name, agent, kda, player_data["mmr_change"], stats_dict)
                         file = discord.File(fp=buffer, filename="recap.png")
                         
                         embed = build_match_embed(

@@ -95,19 +95,44 @@ async def rr(interaction: discord.Interaction, nom: str, tag: str = None, region
                             if p.get("name", "").lower() == nom.lower() and p.get("tag", "").lower() == tag.lower():
                                 agent = p.get("character", "Inconnu")
                                 p_stats = p.get("stats") or {}
-                                kda = f"{p_stats.get('kills', 0)}/{p_stats.get('deaths', 0)}/{p_stats.get('assists', 0)}"
+                                kills = p_stats.get('kills', 0)
+                                deaths = p_stats.get('deaths', 0)
+                                assists = p_stats.get('assists', 0)
+                                kda = f"{kills}/{deaths}/{assists}"
                                 player_team = p.get("team")
                                 p_assets = p.get("assets") or {}
                                 p_agent_assets = p_assets.get("agent") or {}
                                 agent_image_url = p_agent_assets.get("small")
+                                
+                                headshots = p_stats.get("headshots", 0)
+                                bodyshots = p_stats.get("bodyshots", 0)
+                                legshots = p_stats.get("legshots", 0)
+                                total_shots = headshots + bodyshots + legshots
+                                hs_pct = round((headshots / total_shots) * 100, 1) if total_shots > 0 else 0.0
+                                
+                                kd = round(kills / deaths, 2) if deaths > 0 else kills
+                                score_raw = p_stats.get("score", 0)
+                                damage_made = p.get("damage_made", 0)
                                 break
                         
+                        nb_rounds = 0
                         if player_team:
                             teams = match.get("teams") or {}
                             my_team = teams.get(player_team.lower()) or {}
                             enemy_team_key = "blue" if player_team.lower() == "red" else "red"
                             enemy_team = teams.get(enemy_team_key) or {}
                             match_score = f"{my_team.get('rounds_won', 0)}-{enemy_team.get('rounds_won', 0)}"
+                            nb_rounds = my_team.get('rounds_won', 0) + enemy_team.get('rounds_won', 0)
+                            
+                        acs = round(score_raw / nb_rounds) if nb_rounds > 0 else 0
+                        adr = round(damage_made / nb_rounds) if nb_rounds > 0 else 0
+                        
+                        stats_dict = {
+                            "hs_pct": hs_pct,
+                            "kd": kd,
+                            "adr": adr,
+                            "acs": acs
+                        }
 
             # 3. Construction de l'Embed et de l'Image
             is_win = (changement_rr > 0)
@@ -118,7 +143,7 @@ async def rr(interaction: discord.Interaction, nom: str, tag: str = None, region
             phrase_desc = f"{nom} vient de {action_rr} {abs(changement_rr)} RR ({rang} {rr_actuel} RR)"
 
             from utils.image_generator import generate_match_image
-            buffer = await generate_match_image(map_name, agent, kda, changement_rr)
+            buffer = await generate_match_image(map_name, agent, kda, changement_rr, stats_dict)
             file = discord.File(fp=buffer, filename="recap.png")
 
             embed = discord.Embed(
