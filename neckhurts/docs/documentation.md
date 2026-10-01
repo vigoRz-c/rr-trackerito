@@ -14,10 +14,12 @@ Permet de consulter ponctuellement les statistiques d'un joueur. Elle affiche le
 Permet d'associer un compte Discord à un compte Riot Valorant et de suivre son évolution en arrière-plan.
 - **`/link <nom> <tag> <region>`** : Lier son compte Riot.
 - **`/unlink`** : Supprimer l'association.
-- **Tâche de fond (Tracker)** : Toutes les 2 minutes (délai optimisé), le bot vérifie l'Elo des comptes enregistrés. S'il y a un changement, le bot envoie automatiquement un Embed détaillé de fin de partie dans le salon configuré.
+- **Tâche de fond (Tracker)** : Toutes les 2 minutes (délai optimisé), le bot vérifie l'Elo des comptes enregistrés. S'il y a un changement, le bot envoie automatiquement un **Embed Premium** de fin de partie dans le salon configuré.
+  - L'embed affiche : **Rang actuel + emoji de rang**, **bannière du rang en image principale**, **miniature de l'agent**, **KDA**, **ACS** (Average Combat Score), **HS%** (Headshot %), **Map**, **nombre de rounds**, et le **changement de RR** mis en valeur.
+  - Un **bouton interactif** « 🕹️ 5 dernières games » est attaché à chaque message : en cliquant dessus, le joueur reçoit un récapitulatif éphémère de ses 5 dernières parties (agent, KDA, ACS, HS%, score).
 
 ### 3. Récapitulatif Quotidien (9h00)
-- **Tâche de fond (Daily Recap)** : Tous les jours à 9h00, le bot analyse l'historique complet de la veille pour chaque joueur enregistré. Il génère un rapport montrant le nombre de victoires/défaites, le winrate, et l'évolution globale des RR sur la journée. 
+- **Tâche de fond (Daily Recap)** : Tous les jours à 9h00, le bot analyse l'historique complet de la veille pour chaque joueur enregistré. Il génère un rapport montrant le nombre de victoires/défaites (avec emojis ✅/❌), le winrate, l'évolution globale des RR et la progression de rang (avant → après). 
 - **Rattrapage (Catch-up)** : Si le bot est éteint à 9h00, il mémorise son retard et enverra le récapitulatif manquant instantanément dès qu'il sera rallumé.
 
 ### 4. Commandes de Test (Admins)
