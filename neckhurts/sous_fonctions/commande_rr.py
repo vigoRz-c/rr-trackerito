@@ -3,12 +3,37 @@ from discord import app_commands
 import aiohttp
 import os
 import datetime
+from sous_fonctions.tracker import load_data
 
 HENRIK_API_KEY = os.getenv("HENRIK_API_KEY")
 
+async def autocomplete_nom(interaction: discord.Interaction, current: str) -> list[app_commands.Choice[str]]:
+    tracker_data = load_data()
+    choices = []
+    vus = set()
+    for info in tracker_data.values():
+        nom = info["nom"]
+        if current.lower() in nom.lower() and nom not in vus:
+            vus.add(nom)
+            choices.append(app_commands.Choice(name=f"{nom}#{info['tag']}", value=nom))
+    return choices[:25]
+
 @app_commands.command(name="rr", description="Affiche le rang et le détail de la dernière game d'un joueur Valorant")
 @app_commands.describe(nom="Ton pseudo Valorant", tag="Ton tag (sans le #)", region="Ta région (ex: eu, na, ap)")
-async def rr(interaction: discord.Interaction, nom: str, tag: str, region: str = "eu"):
+@app_commands.autocomplete(nom=autocomplete_nom)
+async def rr(interaction: discord.Interaction, nom: str, tag: str = None, region: str = "eu"):
+    
+    if tag is None:
+        tracker_data = load_data()
+        for info in tracker_data.values():
+            if info["nom"].lower() == nom.lower():
+                tag = info["tag"]
+                break
+        
+        if tag is None:
+            await interaction.response.send_message("❌ Tu dois fournir un tag si le joueur n'est pas encore enregistré !", ephemeral=True)
+            return
+
     await interaction.response.defer()
 
     if not HENRIK_API_KEY:
