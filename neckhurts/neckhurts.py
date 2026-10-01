@@ -15,7 +15,6 @@ from discord import app_commands
 load_dotenv()
 TOKEN = os.getenv("DISCORD_TOKEN")
 
-from cogs.commande_rr import rr
 from cogs.tracker import link, unlink, TrackerTask, load_data, save_data
 from cogs.classement import classement
 if not TOKEN:
@@ -43,7 +42,6 @@ class MyClient(discord.Client):
 client = MyClient(intents=intents)
 
 # ========== COMMANDES SLASH ==========
-client.tree.add_command(rr)
 client.tree.add_command(link)
 client.tree.add_command(unlink)
 client.tree.add_command(classement)

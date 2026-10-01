@@ -210,21 +210,21 @@ def build_match_embed(nom, tag, rang, mmr_change, match_score):
     # On utilise mmr_change (changement RR de la dernière game) et non diff
     is_win = mmr_change > 1
     is_draw = mmr_change == 0   
-    result_text = "VICTOIRE" if is_win else "DÉFAITE" if not is_draw else "ÉGALITÉ"
+    result_text = "VICTOIRE" if is_win else "DÉFAITE" if not is_draw else "EGALITE"
     color = discord.Color.from_rgb(0, 200, 120) if is_win else discord.Color.from_rgb(255, 60, 80) if not is_draw else discord.Color.from_rgb(120, 120, 120)
 
     embed = discord.Embed(
         title=f"{result_text}",
-        description=f"▸  **{nom}** vient de terminer une ranked",
+        description=f"▶ {nom} vient de terminer une ranked",
         color=color
     )
     embed.set_author(
-        name=f"{nom}#{tag}  —  {rang}",
+        name=f"{nom}#{tag} — {rang}",
         icon_url=VALORANT_ICON
     )
 
     embed.set_image(url="attachment://recap.png")
-    embed.set_footer(text="RR Trackerito  ·  Données via HenrikDev")
+    embed.set_footer(text="RR Trackerito • Données via HenrikDev")
     embed.timestamp = datetime.datetime.now()
     return embed
 
