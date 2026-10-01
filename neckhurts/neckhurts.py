@@ -1,4 +1,12 @@
 import os
+import sys
+
+# Si l'application est compilée (PyInstaller), on se place dans le dossier de l'exécutable, sinon dans celui du script
+if getattr(sys, 'frozen', False):
+    os.chdir(os.path.dirname(sys.executable))
+else:
+    os.chdir(os.path.dirname(os.path.abspath(__file__)))
+
 import discord
 from dotenv import load_dotenv
 from discord import app_commands
