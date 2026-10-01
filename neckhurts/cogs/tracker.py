@@ -6,6 +6,7 @@ import os
 import json
 import datetime
 from utils.image_generator import generate_match_image
+from utils.image_reports_generator import generate_daily_recap_image
 
 os.makedirs("data", exist_ok=True)
 DATA_FILE = "data/tracker_data.json"
@@ -450,48 +451,36 @@ class TrackerTask:
     async def execute_daily_recap(self):
         if not HENRIK_API_KEY:
             return
-            
+
         tracker_data = load_data()
         if not tracker_data:
             return
-            
+
         channel = None
         if self.channel_id:
             try:
                 channel = self.client.get_channel(int(self.channel_id))
             except:
                 pass
-        
-        if not channel and not tracker_data:
-            return
-            
+
         headers = {"Authorization": HENRIK_API_KEY}
-        
+
         now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=2)))
         yesterday = now - datetime.timedelta(days=1)
         start_of_yesterday = yesterday.replace(hour=0, minute=0, second=0, microsecond=0)
-        end_of_yesterday = yesterday.replace(hour=23, minute=59, second=59, microsecond=999999)
-        
+        end_of_yesterday   = yesterday.replace(hour=23, minute=59, second=59, microsecond=999999)
         start_ts = int(start_of_yesterday.timestamp())
-        end_ts = int(end_of_yesterday.timestamp())
-        
-        embed = discord.Embed(
-            title=f"Recap du {yesterday.strftime('%d/%m/%Y')}",
-            color=discord.Color.from_rgb(160, 100, 255)
-        )
-        embed.set_author(
-            name="Recap Quotidien — RR Trackerito",
-            icon_url="https://media.valorant-api.com/competitivetiers/03621f52-342b-cf4e-4f86-9350a49c6d04/24/largeicon.png"
-        )
+        end_ts   = int(end_of_yesterday.timestamp())
 
-        has_data = False
+        date_label  = yesterday.strftime("%d/%m/%Y")
+        players_data = []
 
         async with aiohttp.ClientSession() as session:
             for discord_id, info in tracker_data.items():
                 if discord_id == "_meta":
                     continue
-                nom = info["nom"]
-                tag = info["tag"]
+                nom    = info["nom"]
+                tag    = info["tag"]
                 region = info["region"]
 
                 url = f"https://api.henrikdev.xyz/valorant/v1/mmr-history/{region}/{nom}/{tag}"
@@ -500,15 +489,18 @@ class TrackerTask:
                         if response.status == 200:
                             data_api = (await response.json()).get("data", [])
 
-                            yesterday_matches = [m for m in data_api if start_ts <= m.get("date_raw", 0) <= end_ts]
+                            yesterday_matches = [
+                                m for m in data_api
+                                if start_ts <= m.get("date_raw", 0) <= end_ts
+                            ]
                             if not yesterday_matches:
                                 continue
 
                             yesterday_matches.sort(key=lambda x: x.get("date_raw", 0))
 
-                            wins = 0
-                            losses = 0
-                            draws = 0
+                            wins     = 0
+                            losses   = 0
+                            draws    = 0
                             total_rr = 0
 
                             for m in yesterday_matches:
@@ -522,49 +514,85 @@ class TrackerTask:
                                     draws += 1
 
                             total_games = wins + losses + draws
-                            winrate = round((wins / total_games) * 100, 1) if total_games > 0 else 0
+                            winrate     = round((wins / total_games) * 100, 1) if total_games > 0 else 0.0
 
                             end_match = yesterday_matches[-1]
-                            end_tier = end_match.get("currenttierpatched", "Inconnu")
-                            end_rr = end_match.get("ranking_in_tier", 0)
-                            end_str = f"{end_tier} {end_rr}rr"
+                            end_rang  = end_match.get("currenttierpatched", "Inconnu")
+                            end_rr    = end_match.get("ranking_in_tier", 0)
 
                             oldest_match_index = data_api.index(yesterday_matches[0])
                             if oldest_match_index + 1 < len(data_api):
                                 before_match = data_api[oldest_match_index + 1]
-                                start_tier = before_match.get("currenttierpatched", "Inconnu")
-                                start_rr = before_match.get("ranking_in_tier", 0)
+                                start_rang   = before_match.get("currenttierpatched", "Inconnu")
+                                start_rr     = before_match.get("ranking_in_tier", 0)
                             else:
-                                start_tier = yesterday_matches[0].get("currenttierpatched", "Inconnu")
-                                start_rr = yesterday_matches[0].get("ranking_in_tier", 0) - yesterday_matches[0].get("mmr_change_to_last_game", 0)
+                                start_rang = yesterday_matches[0].get("currenttierpatched", "Inconnu")
+                                start_rr   = yesterday_matches[0].get("ranking_in_tier", 0) - yesterday_matches[0].get("mmr_change_to_last_game", 0)
                                 if start_rr < 0 or start_rr >= 100:
-                                    start_tier = "Inconnu"
-                                    start_rr = "?"
+                                    start_rang = "Inconnu"
+                                    start_rr   = 0
 
-                            start_str = f"{start_tier} {start_rr}rr" if start_tier != "Inconnu" else "Inconnu"
-
-                            sign = "+" if total_rr >= 0 else ""
-                            wins_str = f"{wins}W" if wins > 0 else ""
-                            losses_str = f"{losses}L" if losses > 0 else ""
-                            draws_str = f"{draws}D" if draws > 0 else ""
-                            result_parts = [p for p in [wins_str, losses_str, draws_str] if p]
-                            stats_str = "  ".join(result_parts) + f"  ({winrate}%WR)"
-
-                            title = f"{nom}#{tag}  •  {sign}{total_rr} RR"
-                            desc = f"{stats_str}\n`{start_str}` → `{end_str}`"
-
-                            embed.add_field(name=title, value=desc, inline=False)
-                            has_data = True
+                            players_data.append({
+                                "nom":        nom,
+                                "tag":        tag,
+                                "total_rr":   total_rr,
+                                "wins":       wins,
+                                "losses":     losses,
+                                "draws":      draws,
+                                "winrate":    winrate,
+                                "start_rang": start_rang,
+                                "start_rr":   start_rr,
+                                "end_rang":   end_rang,
+                                "end_rr":     end_rr,
+                            })
                 except Exception as e:
                     print(f"Erreur Recap pour {nom}#{tag} : {e}")
-                    
-        if has_data:
+
+        if not players_data:
+            return
+
+        print("=== RÉCAPITULATIF ENVOYÉ SUR DISCORD ===")
+        for pd in players_data:
+            print(json.dumps(pd, indent=4, ensure_ascii=False))
+
+        try:
+            buf  = await generate_daily_recap_image(date_label, players_data)
+            file = discord.File(fp=buf, filename="recap_quotidien.png")
+
+            if channel:
+                await channel.send(file=file)
+            else:
+                for discord_id in tracker_data:
+                    if discord_id == "_meta":
+                        continue
+                    user = self.client.get_user(int(discord_id))
+                    if user:
+                        try:
+                            await user.send(file=file)
+                        except:
+                            pass
+        except Exception as e:
+            print(f"Erreur génération image recap : {e}")
+            # Fallback : embed texte
+            embed = discord.Embed(
+                title=f"Recap du {date_label}",
+                color=discord.Color.from_rgb(160, 100, 255)
+            )
+            embed.set_author(
+                name="Recap Quotidien — RR Trackerito",
+                icon_url="https://media.valorant-api.com/competitivetiers/03621f52-342b-cf4e-4f86-9350a49c6d04/24/largeicon.png"
+            )
+            for pd in players_data:
+                sign      = "+" if pd["total_rr"] >= 0 else ""
+                stats_str = f"{pd['wins']}W  {pd['losses']}L  ({pd['winrate']}%WR)"
+                desc      = f"{stats_str}\n`{pd['start_rang']} {pd['start_rr']}rr` → `{pd['end_rang']} {pd['end_rr']}rr`"
+                embed.add_field(
+                    name=f"{pd['nom']}#{pd['tag']}  •  {sign}{pd['total_rr']} RR",
+                    value=desc,
+                    inline=False
+                )
             embed.set_footer(text="RR Trackerito  •  Données via HenrikDev")
             embed.timestamp = datetime.datetime.now()
-
-            print("=== RÉCAPITULATIF ENVOYÉ SUR DISCORD ===")
-            print(json.dumps(embed.to_dict(), indent=4, ensure_ascii=False))
-
             if channel:
                 await channel.send(embed=embed)
             else:
