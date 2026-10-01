@@ -37,3 +37,9 @@ Si `TRACKER_CHANNEL_ID` n'était pas défini dans le `.env`, la boucle Tracker e
 
 12. **Génération d'objets JSON dans le terminal** :
 Pour faciliter le débogage et l'inspection des données, des logs ont été ajoutés pour imprimer dans le terminal le contenu exact des embeds (au format JSON) avant leur envoi sur Discord, remplaçant ainsi le message envahissant de démarrage dans le salon Discord.
+
+13. **Migration vers l'embed premium style RR Tracker** :
+L'embed de fin de partie a été entièrement refondu pour afficher : rang avec emoji, bannière du rang (`RANK_BANNER_URLS`), miniature de l'agent, KDA, ACS (score brut / nb_rounds), HS% (headshots / total_shots × 100), Map, nombre de rounds, et le gain/perte de RR en `code block`. Les données de HS%, bodyshots et legshots proviennent de `stats.headshots/bodyshots/legshots` dans la réponse v3/matches. L'ACS est calculé côté bot via `score_raw / rounds_played`. Un bouton interactif `DernieresGamesView` (discord.ui.View, timeout=120s) est attaché à chaque message pour afficher les 5 dernières games en éphémère.
+
+14. **Fausse détection Victoire/Défaite** :
+Le titre de l'embed (`VICTOIRE` / `DÉFAITE`) était calculé à partir de `diff = current_elo - last_elo` (l'écart ELO global depuis la dernière vérification). Si le joueur a joué plusieurs parties entre deux cycles de 2 minutes, ce `diff` peut être positif alors que la *dernière game* était une défaite, d'où des VICTOIRE affichées avec -19 RR. **Fix** : utiliser `mmr_change_to_last_game` (retourné directement par l'API HenrikDev) pour déterminer `is_win`/`is_draw`, car il représente précisément le RR changé lors de la dernière partie.

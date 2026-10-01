@@ -196,8 +196,10 @@ class DernieresGamesView(discord.ui.View):
 def build_match_embed(nom, tag, rang, rr_actuel, mmr_change, diff,
                       agent, kda, map_name, match_score, agent_image_url,
                       acs, hs_pct, nb_rounds):
-    is_win = diff > 0
-    is_draw = diff == 0
+    # On utilise mmr_change (changement RR de la dernière game) et non diff
+    # (diff = écart ELO global depuis la dernière vérif, faussé si plusieurs games jouées)
+    is_win = mmr_change > 0
+    is_draw = mmr_change == 0
     result_text = "VICTOIRE" if is_win else "DÉFAITE" if not is_draw else "ÉGALITÉ"
     color = discord.Color.from_rgb(0, 200, 120) if is_win else discord.Color.from_rgb(255, 60, 80) if not is_draw else discord.Color.from_rgb(120, 120, 120)
 
