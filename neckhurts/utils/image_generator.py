@@ -43,7 +43,7 @@ async def get_agent_image(agent_name: str, session: aiohttp.ClientSession) -> Im
         print(f"Erreur get_agent_image: {e}")
     return None
 
-async def generate_match_image(map_name: str, agent_name: str, kda: str, rr_change: int, stats: dict = None) -> io.BytesIO:
+async def generate_match_image(map_name: str, agent_name: str, kda: str, rr_change: int, match_score: str, stats: dict = None) -> io.BytesIO:
     """Génère une image premium récapitulative de la partie."""
     if stats is None:
         stats = {}
@@ -116,18 +116,21 @@ async def generate_match_image(map_name: str, agent_name: str, kda: str, rr_chan
             font_rr = ImageFont.truetype("arialbd.ttf", 70)
             font_kda = ImageFont.truetype("arialbd.ttf", 60)
             font_title = ImageFont.truetype("arial.ttf", 24)
+            font_score = ImageFont.truetype("arialbd.ttf", 36)
             font_stat_val = ImageFont.truetype("arialbd.ttf", 26)
             font_stat_lbl = ImageFont.truetype("arial.ttf", 18)
         except:
             font_rr = ImageFont.truetype("arial.ttf", 70)
             font_kda = ImageFont.truetype("arial.ttf", 60)
             font_title = ImageFont.truetype("arial.ttf", 24)
+            font_score = ImageFont.truetype("arial.ttf", 36)
             font_stat_val = ImageFont.truetype("arial.ttf", 26)
             font_stat_lbl = ImageFont.truetype("arial.ttf", 18)
     except IOError:
         font_rr = ImageFont.load_default()
         font_kda = ImageFont.load_default()
         font_title = ImageFont.load_default()
+        font_score = ImageFont.load_default()
         font_stat_val = ImageFont.load_default()
         font_stat_lbl = ImageFont.load_default()
         
@@ -136,6 +139,9 @@ async def generate_match_image(map_name: str, agent_name: str, kda: str, rr_chan
     # Title
     info_text = f"{map_name.upper()} • {agent_name.upper()}"
     draw.text((text_x, 40), info_text, fill=(200, 200, 200, 255), font=font_title)
+    
+    # Match Score (Top Right)
+    draw.text((760, 35), match_score, fill=(230, 230, 230, 255), font=font_score, anchor="rt")
     
     # KDA
     draw.text((text_x, 80), f"KDA: {kda}", fill=(255, 255, 255, 255), font=font_kda)
