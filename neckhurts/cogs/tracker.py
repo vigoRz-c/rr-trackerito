@@ -410,14 +410,17 @@ class TrackerTask:
                         deaths = ps.get("deaths", 0)
                         kd = round(kills / deaths, 2) if deaths > 0 else kills
                         nb_rounds = sum(map(int, match_score.split('-'))) if '-' in match_score else 0
-                        acs = compute_acs(ps.get("score_raw", 0), nb_rounds)
+                        
+                        # Le nouveau Combat Score (CS) est simplement le total brut des points (score) sur la partie,
+                        # il ne doit plus être divisé par le nombre de rounds comme l'ancien ACS.
+                        cs = ps.get("score_raw", 0)
                         adr = round(ps.get("damage_made", 0) / nb_rounds) if nb_rounds > 0 else 0
                         
                         stats_dict = {
                             "hs_pct": ps.get("hs_pct", 0),
                             "kd": kd,
                             "adr": adr,
-                            "acs": acs
+                            "acs": cs
                         }
                         
                         buffer = await generate_match_image(map_name, agent, kda, player_data["mmr_change"], stats_dict)
