@@ -5,7 +5,6 @@ import aiohttp
 import os
 import json
 import datetime
-import zoneinfo
 
 DATA_FILE = "tracker_data.json"
 HENRIK_API_KEY = os.getenv("HENRIK_API_KEY")
@@ -211,7 +210,7 @@ class TrackerTask:
     async def before_tracker_loop(self):
         await self.client.wait_until_ready()
 
-    @tasks.loop(time=datetime.time(hour=9, minute=0, tzinfo=zoneinfo.ZoneInfo("Europe/Paris")))
+    @tasks.loop(time=datetime.time(hour=9, minute=0, tzinfo=datetime.timezone(datetime.timedelta(hours=2))))
     async def daily_recap(self):
         if not HENRIK_API_KEY:
             return
@@ -232,7 +231,7 @@ class TrackerTask:
             
         headers = {"Authorization": HENRIK_API_KEY}
         
-        now = datetime.datetime.now(zoneinfo.ZoneInfo("Europe/Paris"))
+        now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=2)))
         yesterday = now - datetime.timedelta(days=1)
         start_of_yesterday = yesterday.replace(hour=0, minute=0, second=0, microsecond=0)
         end_of_yesterday = yesterday.replace(hour=23, minute=59, second=59, microsecond=999999)
