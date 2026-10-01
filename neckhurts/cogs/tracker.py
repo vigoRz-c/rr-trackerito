@@ -173,10 +173,10 @@ class DernieresGamesView(discord.ui.View):
                 score_str = f"{my_r}-{en_r}"
 
                 won = my_team.get("has_won", False)
-                result_icon = "✅" if won else "❌"
+                result_label = "Victoire" if won else "Défaite"
 
                 embed.add_field(
-                    name=f"{result_icon} Game {i} — {map_name}",
+                    name=f"{result_label} {i} — {map_name}",
                     value=(
                         f"**Agent:** {ps['agent']}  |  **KDA:** {ps['kda']}  |  "
                         f"**ACS:** {acs}  |  **HS%:** {ps['hs_pct']}%  |  **Score:** {score_str}"
@@ -203,38 +203,35 @@ def build_match_embed(nom, tag, rang, rr_actuel, mmr_change, diff,
 
     sign = "+" if mmr_change >= 0 else ""
     rr_display = f"{sign}{mmr_change} RR"
-    emoji = rank_emoji(rang)
 
     embed = discord.Embed(
         title=f"{result_text}  •  {match_score}",
         color=color
     )
     embed.set_author(
-        name=f"{nom}#{tag}  —  {emoji} {rang}  {rr_actuel} RR",
+        name=f"{nom}#{tag}  —  {rang}  {rr_actuel} RR",
         icon_url=VALORANT_ICON
     )
 
-    # Bannière du rang en image principale
+    # Icone du rang en miniature (petite, coin droit) + agent en image si dispo
     rank_banner = RANK_BANNER_URLS.get(rang)
-    if rank_banner:
-        embed.set_image(url=rank_banner)
-
-    # Miniature de l'agent
     if agent_image_url:
         embed.set_thumbnail(url=agent_image_url)
+    elif rank_banner:
+        embed.set_thumbnail(url=rank_banner)
 
     # ─ Stats ligne 1 : KDA / ACS / HS% ─
-    embed.add_field(name="🎯 KDA", value=f"**{kda}**", inline=True)
-    embed.add_field(name="⚔️ ACS", value=f"**{acs}**", inline=True)
-    embed.add_field(name="🔫 HS%", value=f"**{hs_pct}%**", inline=True)
+    embed.add_field(name="KDA", value=f"**{kda}**", inline=True)
+    embed.add_field(name="ACS", value=f"**{acs}**", inline=True)
+    embed.add_field(name="HS%", value=f"**{hs_pct}%**", inline=True)
 
     # ─ Stats ligne 2 : Agent / Map / Rounds ─
-    embed.add_field(name="🦸 Agent", value=agent, inline=True)
-    embed.add_field(name="🗺️ Map", value=map_name, inline=True)
-    embed.add_field(name="🔄 Rounds", value=str(nb_rounds), inline=True)
+    embed.add_field(name="Agent", value=agent, inline=True)
+    embed.add_field(name="Map", value=map_name, inline=True)
+    embed.add_field(name="Rounds", value=str(nb_rounds), inline=True)
 
     # ─ RR en grand ─
-    rr_label = "📈 RR Gagnés" if is_win else "📉 RR Perdus" if not is_draw else "➡️ RR"
+    rr_label = "RR Gagnés" if is_win else "RR Perdus" if not is_draw else "RR"
     embed.add_field(name=rr_label, value=f"```{rr_display}```", inline=False)
 
     embed.set_footer(text="Neckhurts Tracker  •  Données via HenrikDev")
@@ -546,14 +543,13 @@ class TrackerTask:
                             start_str = f"{start_tier} {start_rr}rr" if start_tier != "Inconnu" else "Inconnu"
 
                             sign = "+" if total_rr >= 0 else ""
-                            wins_str = f"✅ {wins}W" if wins > 0 else ""
-                            losses_str = f"❌ {losses}L" if losses > 0 else ""
-                            draws_str = f"➡️ {draws}D" if draws > 0 else ""
+                            wins_str = f"{wins}W" if wins > 0 else ""
+                            losses_str = f"{losses}L" if losses > 0 else ""
+                            draws_str = f"{draws}D" if draws > 0 else ""
                             result_parts = [p for p in [wins_str, losses_str, draws_str] if p]
                             stats_str = "  ".join(result_parts) + f"  ({winrate}%WR)"
 
-                            emoji = rank_emoji(end_tier)
-                            title = f"{emoji} {nom}#{tag}  •  {sign}{total_rr} RR"
+                            title = f"{nom}#{tag}  •  {sign}{total_rr} RR"
                             desc = f"{stats_str}\n`{start_str}` → `{end_str}`"
 
                             embed.add_field(name=title, value=desc, inline=False)
