@@ -1,40 +1,44 @@
 # Documentation de Neckhurts (RR Tracker Valorant)
 
 ## Introduction
-Le bot Neckhurts est un bot Discord 100% dédié au suivi des statistiques et des parties classées (Ranked Rating) sur le jeu Valorant. Toutes les anciennes fonctionnalités (troll, etc.) ont été complètement retirées pour se concentrer sur l'API Valorant.
+Le bot Neckhurts est un bot Discord 100% dédié au suivi des statistiques et des parties classées (Ranked Rating) sur le jeu Valorant.
 
 ## Fonctionnalités Valorant
 
-### 1. Commande `/rr`
-Permet de consulter ponctuellement les statistiques d'un joueur sans l'enregistrer dans le tracker.
-- **Paramètres** : `nom`, `tag`, `region` (par défaut 'eu').
-- **Utilisation** : `/rr nom:TenZ tag:000 region:na`
+### 1. Commande `/rr` (Détails du dernier match)
+Permet de consulter ponctuellement les statistiques d'un joueur. Elle affiche le Rang, les RR actuels, mais aussi les **détails de la dernière game** (KDA, Agent, Map, Résultat).
+- **Paramètres** : `nom` (avec autocomplétion), `tag` (optionnel si le joueur est enregistré), `region` (par défaut 'eu').
+- **Utilisation** : `/rr nom:TenZ tag:000 region:na` ou juste `/rr nom:PerrierGingembre` grâce à l'autocomplétion.
 
 ### 2. Tracker Automatique et Commande `/link`
-Permet d'associer un compte Discord à un compte Riot Valorant et de suivre son évolution de RR en arrière-plan.
-- **`/link <nom> <tag> <region>`** : Lier son compte Riot à son profil Discord.
+Permet d'associer un compte Discord à un compte Riot Valorant et de suivre son évolution en arrière-plan.
+- **`/link <nom> <tag> <region>`** : Lier son compte Riot.
 - **`/unlink`** : Supprimer l'association.
-- **Tâche de fond (Tracker)** : Toutes les 10 minutes, le bot vérifie les statistiques (Elo) de chaque compte enregistré. Si l'Elo a changé (fin d'une partie), le bot récupère **les statistiques de ce dernier match** (Map, Score final, Agent joué, KDA) et envoie un récapitulatif détaillé sous forme d'Embed (encart graphique) dans un salon dédié (ou en message privé).
+- **Tâche de fond (Tracker)** : Toutes les 10 minutes, le bot vérifie l'Elo des comptes enregistrés. S'il y a un changement, le bot envoie automatiquement un Embed détaillé de fin de partie dans le salon configuré.
+
+### 3. Récapitulatif Quotidien (9h00)
+- **Tâche de fond (Daily Recap)** : Tous les jours à 9h00, le bot analyse l'historique complet de la veille pour chaque joueur enregistré. Il génère un rapport montrant le nombre de victoires/défaites, le winrate, et l'évolution globale des RR sur la journée, envoyé dans le salon configuré.
+
+### 4. Commandes de Test (Admins)
+- **`/test_game`** : Simule artificiellement un changement d'ELO pour tester l'annonce automatique du tracker.
+- **`/test_recap`** : Force la génération et l'envoi immédiat du récapitulatif quotidien de la veille.
 
 ## Installation / Configuration
 
-1. Obtenez une clé API depuis le portail de développeur [HenrikDev](https://dev.henrikdev.xyz/).
-2. Créez un fichier `.env` à la racine du projet (ce fichier ne doit jamais être partagé ou commité) :
+1. Obtenez une clé API depuis [HenrikDev](https://dev.henrikdev.xyz/).
+2. Créez un fichier `.env` à la racine :
 ```env
 DISCORD_TOKEN=votre_token_discord
 HENRIK_API_KEY=votre_cle_api_henrik
-TRACKER_CHANNEL_ID=123456789012345678 # (Optionnel, l'ID du salon où le bot doit annoncer les changements de RR)
+TRACKER_CHANNEL_ID=123456789012345678 # ID du salon où le bot doit annoncer les changements de RR
 ```
-3. Installez les dépendances nécessaires : 
+3. Installez les dépendances : 
    `pip install discord.py python-dotenv aiohttp`
-4. Lancez le bot via le fichier exécutable `neckhurts.exe` (ou recompilez-le avec `pyinstaller neckhurts.spec`).
+4. Lancez `neckhurts.exe` ou recompilez-le avec `pyinstaller neckhurts.spec`.
 
 ## Fichiers de données
-Le bot stocke les joueurs enregistrés dans un fichier JSON nommé `tracker_data.json` à la racine du projet. Ce fichier est généré automatiquement lors de la première exécution de la commande `/link`.
+Les joueurs sont stockés dans le fichier `tracker_data.json` à la racine.
 
 ## Dépannage (Erreurs courantes)
-
-- **L'éditeur de code (ex: VSCode) souligne `discord` ou `dotenv` en rouge ("Cannot find module")** :
-  C'est un problème d'environnement virtuel. Votre éditeur pointe probablement vers une installation Python différente de celle où vous avez installé les bibliothèques. Vous pouvez soit ignorer cette erreur visuelle, soit changer l'interpréteur Python dans votre éditeur (en bas à droite sur VSCode) pour pointer vers l'installation où `discord.py` est installé (ex: Python 3.14).
-- **L'exécutable se ferme instantanément** :
-  Assurez-vous que le fichier `.env` est bien présent dans le même dossier que l'exécutable et qu'il contient bien votre token. Si vous recompilez, assurez-vous d'avoir installé les modules via `pip` dans l'environnement que PyInstaller utilise.
+- **L'exécutable se ferme instantanément** : Assurez-vous que le fichier `.env` est présent avec votre token. 
+- **PyInstaller & Fuseaux Horaires** : L'utilisation du module `zoneinfo` peut faire crasher PyInstaller sur Windows s'il n'arrive pas à compiler la base `tzdata`. Le code utilise un décalage horaire en dur (UTC+2) pour éviter ce problème.
