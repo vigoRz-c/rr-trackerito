@@ -145,24 +145,28 @@ class TrackerTask:
                                             match_data = await match_resp.json()
                                             if match_data.get("data") and len(match_data["data"]) > 0:
                                                 match = match_data["data"][0]
-                                                map_name = match.get("metadata", {}).get("map", "Inconnue")
+                                                metadata = match.get("metadata") or {}
+                                                map_name = metadata.get("map", "Inconnue")
                                                 
-                                                all_players = match.get("players", {}).get("all_players", [])
+                                                players_dict = match.get("players") or {}
+                                                all_players = players_dict.get("all_players", [])
                                                 player_team = None
                                                 for p in all_players:
                                                     if p.get("name", "").lower() == nom.lower() and p.get("tag", "").lower() == tag.lower():
                                                         agent = p.get("character", "Inconnu")
-                                                        stats = p.get("stats", {})
+                                                        stats = p.get("stats") or {}
                                                         kda = f"{stats.get('kills', 0)}/{stats.get('deaths', 0)}/{stats.get('assists', 0)}"
                                                         player_team = p.get("team")
-                                                        agent_image_url = p.get("assets", {}).get("agent", {}).get("small")
+                                                        p_assets = p.get("assets") or {}
+                                                        p_agent_assets = p_assets.get("agent") or {}
+                                                        agent_image_url = p_agent_assets.get("small")
                                                         break
                                                 
                                                 if player_team:
-                                                    teams = match.get("teams", {})
-                                                    my_team = teams.get(player_team.lower(), {})
+                                                    teams = match.get("teams") or {}
+                                                    my_team = teams.get(player_team.lower()) or {}
                                                     enemy_team_key = "blue" if player_team.lower() == "red" else "red"
-                                                    enemy_team = teams.get(enemy_team_key, {})
+                                                    enemy_team = teams.get(enemy_team_key) or {}
                                                     my_rounds = my_team.get("rounds_won", 0)
                                                     enemy_rounds = enemy_team.get("rounds_won", 0)
                                                     match_score = f"{my_rounds}-{enemy_rounds}"

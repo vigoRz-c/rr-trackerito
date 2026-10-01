@@ -63,7 +63,7 @@ async def rr(interaction: discord.Interaction, nom: str, tag: str = None, region
                     await interaction.followup.send("❌ Aucune donnée MMR trouvée pour ce joueur.")
                     return
                     
-                stats = data_mmr["data"]
+                stats = data_mmr["data"] or {}
                 rang = stats.get("currenttierpatched", "Inconnu")
                 rr_actuel = stats.get("ranking_in_tier", 0)
                 changement_rr = stats.get("mmr_change_to_last_game", 0)
@@ -80,24 +80,28 @@ async def rr(interaction: discord.Interaction, nom: str, tag: str = None, region
                     data_match = await resp_match.json()
                     if data_match.get("data") and len(data_match["data"]) > 0:
                         match = data_match["data"][0]
-                        map_name = match.get("metadata", {}).get("map", "Inconnue")
+                        metadata = match.get("metadata") or {}
+                        map_name = metadata.get("map", "Inconnue")
                         
-                        all_players = match.get("players", {}).get("all_players", [])
+                        players_dict = match.get("players") or {}
+                        all_players = players_dict.get("all_players", [])
                         player_team = None
                         for p in all_players:
                             if p.get("name", "").lower() == nom.lower() and p.get("tag", "").lower() == tag.lower():
                                 agent = p.get("character", "Inconnu")
-                                p_stats = p.get("stats", {})
+                                p_stats = p.get("stats") or {}
                                 kda = f"{p_stats.get('kills', 0)}/{p_stats.get('deaths', 0)}/{p_stats.get('assists', 0)}"
                                 player_team = p.get("team")
-                                agent_image_url = p.get("assets", {}).get("agent", {}).get("small")
+                                p_assets = p.get("assets") or {}
+                                p_agent_assets = p_assets.get("agent") or {}
+                                agent_image_url = p_agent_assets.get("small")
                                 break
                         
                         if player_team:
-                            teams = match.get("teams", {})
-                            my_team = teams.get(player_team.lower(), {})
+                            teams = match.get("teams") or {}
+                            my_team = teams.get(player_team.lower()) or {}
                             enemy_team_key = "blue" if player_team.lower() == "red" else "red"
-                            enemy_team = teams.get(enemy_team_key, {})
+                            enemy_team = teams.get(enemy_team_key) or {}
                             match_score = f"{my_team.get('rounds_won', 0)}-{enemy_team.get('rounds_won', 0)}"
 
             # 3. Construction de l'Embed
