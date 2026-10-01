@@ -74,22 +74,31 @@ async def classement(interaction: discord.Interaction):
     # Tri décroissant par ELO
     resultats.sort(key=lambda x: x["elo"], reverse=True)
 
+    # ─ Construction du tableau monospace ─
+    PODIUM = {1: " #1 ", 2: " #2 ", 3: " #3 "}
+    rows = []
+    for i, j in enumerate(resultats, 1):
+        pos = PODIUM.get(i, f" #{i} ")
+        nom_tag = f"{j['nom']}#{j['tag']}"
+        rang_str = j["rang"] if j["elo"] > 0 else "—"
+        rr_str = f"{j['rr']} RR" if j["elo"] > 0 else "—"
+        # Tronque le nom si trop long pour l'alignement
+        nom_tag = nom_tag[:22].ljust(22)
+        rang_str = rang_str[:14].ljust(14)
+        rows.append(f"{pos}  {nom_tag}  {rang_str}  {rr_str}")
+
+    header = " Pos   Joueur                    Rang              RR"
+    sep    = "─" * 52
+    table  = "\n".join(rows)
+    table_block = f"```\n{header}\n{sep}\n{table}\n```"
+
     embed = discord.Embed(
         title="Classement des membres",
+        description=table_block,
         color=discord.Color.from_rgb(255, 180, 0)
     )
     embed.set_author(name="RR Trackerito", icon_url=VALORANT_ICON)
-
-    lines = []
-    for i, joueur in enumerate(resultats, 1):
-        medal = MEDAL.get(i, f"**#{i}**")
-        nom_display = f"{joueur['nom']}#{joueur['tag']}"
-        rang_display = joueur["rang"]
-        rr_display = f"{joueur['rr']} RR" if joueur["elo"] > 0 else "—"
-        lines.append(f"{medal}  **{nom_display}**\n└ {rang_display}  •  {rr_display}")
-
-    embed.description = "\n\n".join(lines) if lines else "Aucune donnée disponible."
-    embed.set_footer(text=f"{len(resultats)} membre(s)  •  Données via HenrikDev")
+    embed.set_footer(text=f"{len(resultats)} membre(s)  ·  Données via HenrikDev")
 
     import datetime
     embed.timestamp = datetime.datetime.now()

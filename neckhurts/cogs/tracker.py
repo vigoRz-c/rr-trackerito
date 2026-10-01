@@ -192,6 +192,15 @@ class DernieresGamesView(discord.ui.View):
             await interaction.followup.send(f"❌ Erreur : {e}", ephemeral=True)
 
 
+# ─── Barre de progression RR ─────────────────────────────────────────────────
+def rr_progress_bar(rr: int, total: int = 100, length: int = 12) -> str:
+    """Génère une barre de progression ASCII pour les RR."""
+    rr = max(0, min(rr, total))
+    filled = round((rr / total) * length)
+    bar = "█" * filled + "░" * (length - filled)
+    return f"`{bar}` {rr}/{total}"
+
+
 # ─── Construction de l'embed premium après une partie ─────────────────────────
 def build_match_embed(nom, tag, rang, rr_actuel, mmr_change, diff,
                       agent, kda, map_name, match_score, agent_image_url,
@@ -204,41 +213,51 @@ def build_match_embed(nom, tag, rang, rr_actuel, mmr_change, diff,
     color = discord.Color.from_rgb(0, 200, 120) if is_win else discord.Color.from_rgb(255, 60, 80) if not is_draw else discord.Color.from_rgb(120, 120, 120)
 
     sign = "+" if mmr_change >= 0 else ""
-    rr_display = f"{sign}{mmr_change} RR"
+    rr_change_str = f"{sign}{mmr_change} RR"
 
     embed = discord.Embed(
-        title=f"{result_text}  •  {match_score}",
+        title=f"{result_text}  ·  {match_score}",
+        description=f"▸  **{nom}** vient de terminer une partie classée",
         color=color
     )
     embed.set_author(
-        name=f"{nom}#{tag}  —  {rang}  {rr_actuel} RR",
+        name=f"{nom}#{tag}  —  {rang}",
         icon_url=VALORANT_ICON
     )
 
-    # Icone du rang en miniature (petite, coin droit) + agent en image si dispo
+    # Miniature : portrait de l'agent en priorité, sinon icône du rang
     rank_banner = RANK_BANNER_URLS.get(rang)
     if agent_image_url:
         embed.set_thumbnail(url=agent_image_url)
     elif rank_banner:
         embed.set_thumbnail(url=rank_banner)
 
-    # ─ Stats ligne 1 : KDA / ACS / HS% ─
+    # ─ Ligne 1 : Performance ─
     embed.add_field(name="KDA", value=f"**{kda}**", inline=True)
     embed.add_field(name="ACS", value=f"**{acs}**", inline=True)
     embed.add_field(name="HS%", value=f"**{hs_pct}%**", inline=True)
 
-    # ─ Stats ligne 2 : Agent / Map / Rounds ─
+    # ─ Ligne 2 : Contexte ─
     embed.add_field(name="Agent", value=agent, inline=True)
     embed.add_field(name="Map", value=map_name, inline=True)
     embed.add_field(name="Rounds", value=str(nb_rounds), inline=True)
 
-    # ─ RR en grand ─
-    rr_label = "RR Gagnés" if is_win else "RR Perdus" if not is_draw else "RR"
-    embed.add_field(name=rr_label, value=f"```{rr_display}```", inline=False)
+    # ─ Séparateur invisible ─
+    embed.add_field(name="\u200b", value="\u200b", inline=False)
 
-    embed.set_footer(text="RR Trackerito  •  Données via HenrikDev")
+    # ─ RR — progression ─
+    rr_label = "RR Gagnés" if is_win else "RR Perdus" if not is_draw else "RR"
+    bar = rr_progress_bar(rr_actuel)
+    embed.add_field(
+        name=rr_label,
+        value=f"**{rr_change_str}**\n{bar}",
+        inline=False
+    )
+
+    embed.set_footer(text="RR Trackerito  ·  Données via HenrikDev")
     embed.timestamp = datetime.datetime.now()
     return embed
+
 
 
 @app_commands.command(name="link", description="Associe ton compte Discord a un compte Valorant pour le tracker.")
