@@ -31,3 +31,9 @@ L'extension `discord.ext.tasks.loop(time=...)` s'exécute uniquement si le bot e
 
 10. **Crash KeyError suite à l'ajout de la clé globale _meta** :
 En ajoutant la clé globale `"_meta"` dans `tracker_data.json` pour stocker des paramètres, les boucles qui itéraient sur tous les profils (`for discord_id, info in tracker_data.items()`) essayaient de lire le pseudo (`info["nom"]`) sur cet objet de configuration interne, causant des `KeyError`. Il a fallu ajouter des conditions `if user_id == "_meta": continue` partout (tracker, commandes, autocomplétion).
+
+11. **Absence de fallback pour le Daily Recap** :
+Si `TRACKER_CHANNEL_ID` n'était pas défini dans le `.env`, la boucle Tracker envoyait les messages de match en message privé (DM) à l'utilisateur, mais le Daily Recap, lui, n'avait pas cette sécurité et ignorait l'envoi. Un fallback a été implémenté pour envoyer le récapitulatif global en DM à tous les utilisateurs enregistrés.
+
+12. **Génération d'objets JSON dans le terminal** :
+Pour faciliter le débogage et l'inspection des données, des logs ont été ajoutés pour imprimer dans le terminal le contenu exact des embeds (au format JSON) avant leur envoi sur Discord, remplaçant ainsi le message envahissant de démarrage dans le salon Discord.

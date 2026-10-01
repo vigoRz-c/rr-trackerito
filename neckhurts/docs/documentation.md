@@ -44,3 +44,5 @@ Les joueurs et la mémoire interne (comme la date du dernier récapitulatif) son
 ## Dépannage (Erreurs courantes)
 - **L'exécutable se ferme instantanément** : Assurez-vous que le fichier `.env` est présent avec votre token et que le dossier `data/` a bien les droits d'écriture. 
 - **PyInstaller & Fuseaux Horaires** : L'utilisation du module `zoneinfo` peut faire crasher PyInstaller sur Windows s'il n'arrive pas à compiler la base `tzdata`. Le code utilise un décalage horaire en dur (UTC+2) pour éviter ce problème.
+- **Débogage des messages Discord** : Le bot imprime en direct dans le terminal les objets JSON complets des embeds qu'il envoie sur Discord (tracker, récapitulatif, `/rr`). Cela permet de vérifier la validité des données avant leur affichage.
+- **Pas de salon configuré (`TRACKER_CHANNEL_ID`)** : Si aucun salon n'est défini, le bot essaiera d'envoyer les notifications de match et le récapitulatif quotidien directement en Message Privé (DM) aux utilisateurs concernés.

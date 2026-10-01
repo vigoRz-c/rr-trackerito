@@ -195,6 +195,9 @@ class TrackerTask:
                                 
                                 embed.timestamp = datetime.datetime.now()
                                 
+                                print("=== MESSAGE ENVOYÉ SUR DISCORD ===")
+                                print(json.dumps(embed.to_dict(), indent=4, ensure_ascii=False))
+                                
                                 if channel:
                                     await channel.send(embed=embed)
                                 else:
@@ -255,7 +258,7 @@ class TrackerTask:
             except:
                 pass
         
-        if not channel:
+        if not channel and not tracker_data:
             return
             
         headers = {"Authorization": HENRIK_API_KEY}
@@ -341,7 +344,21 @@ class TrackerTask:
                     
         if has_data:
             embed.timestamp = datetime.datetime.now()
-            await channel.send(embed=embed)
+            
+            print("=== RÉCAPITULATIF ENVOYÉ SUR DISCORD ===")
+            print(json.dumps(embed.to_dict(), indent=4, ensure_ascii=False))
+            
+            if channel:
+                await channel.send(embed=embed)
+            else:
+                for discord_id in tracker_data:
+                    if discord_id == "_meta": continue
+                    user = self.client.get_user(int(discord_id))
+                    if user:
+                        try:
+                            await user.send(embed=embed)
+                        except:
+                            pass
             
     @daily_recap.before_loop
     async def before_daily_recap(self):

@@ -3,6 +3,7 @@ from discord import app_commands
 import aiohttp
 import os
 import datetime
+import json
 from cogs.tracker import load_data
 
 HENRIK_API_KEY = os.getenv("HENRIK_API_KEY")
@@ -131,6 +132,9 @@ async def rr(interaction: discord.Interaction, nom: str, tag: str = None, region
                 embed.set_thumbnail(url=agent_image_url)
             
             embed.timestamp = datetime.datetime.now()
+            
+            print("=== COMMANDE RR ENVOYÉE SUR DISCORD ===")
+            print(json.dumps(embed.to_dict(), indent=4, ensure_ascii=False))
             
             await interaction.followup.send(embed=embed)
             
