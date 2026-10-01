@@ -2,10 +2,11 @@ import discord
 from discord import app_commands
 import aiohttp
 import os
+import datetime
 
 HENRIK_API_KEY = os.getenv("HENRIK_API_KEY")
 
-@app_commands.command(name="rr", description="Affiche le rang et les RR d'un joueur Valorant")
+@app_commands.command(name="rr", description="Affiche le rang et le détail de la dernière game d'un joueur Valorant")
 @app_commands.describe(nom="Ton pseudo Valorant", tag="Ton tag (sans le #)", region="Ta région (ex: eu, na, ap)")
 async def rr(interaction: discord.Interaction, nom: str, tag: str, region: str = "eu"):
     await interaction.response.defer()
@@ -18,37 +19,87 @@ async def rr(interaction: discord.Interaction, nom: str, tag: str, region: str =
         "Authorization": HENRIK_API_KEY
     }
     
-    url = f"https://api.henrikdev.xyz/valorant/v1/mmr/{region}/{nom}/{tag}"
+    url_mmr = f"https://api.henrikdev.xyz/valorant/v1/mmr/{region}/{nom}/{tag}"
+    url_match = f"https://api.henrikdev.xyz/valorant/v3/matches/{region}/{nom}/{tag}?size=1"
 
     async with aiohttp.ClientSession() as session:
-        async with session.get(url, headers=headers) as response:
-            if response.status == 200:
-                data = await response.json()
-                if "data" not in data or data["data"] is None:
-                    await interaction.followup.send("❌ Aucune donnée MMR trouvée pour ce joueur (peut-être qu'il n'a pas fait ses parties de placement).")
+        try:
+            # 1. Recuperation du MMR
+            async with session.get(url_mmr, headers=headers) as resp_mmr:
+                if resp_mmr.status == 404:
+                    await interaction.followup.send(f"❌ Joueur `{nom}#{tag}` introuvable sur la région `{region}`.")
                     return
-                
-                stats = data["data"]
-                
+                if resp_mmr.status != 200:
+                    await interaction.followup.send(f"❌ Erreur API MMR ({resp_mmr.status}).")
+                    return
+                    
+                data_mmr = await resp_mmr.json()
+                if "data" not in data_mmr or data_mmr["data"] is None:
+                    await interaction.followup.send("❌ Aucune donnée MMR trouvée pour ce joueur.")
+                    return
+                    
+                stats = data_mmr["data"]
                 rang = stats.get("currenttierpatched", "Inconnu")
                 rr_actuel = stats.get("ranking_in_tier", 0)
                 changement_rr = stats.get("mmr_change_to_last_game", 0)
                 
-                embed = discord.Embed(
-                    title=f"Statistiques de {nom}#{tag}",
-                    color=discord.Color.red()
-                )
-                embed.add_field(name="Rang", value=rang, inline=True)
-                embed.add_field(name="RR Actuel", value=f"{rr_actuel} RR", inline=True)
-                
-                symbole = "📈" if changement_rr > 0 else "📉" if changement_rr < 0 else "➖"
-                embed.add_field(name="Dernière game", value=f"{symbole} {changement_rr} RR", inline=False)
-                
-                await interaction.followup.send(embed=embed)
+            # 2. Recuperation des details du dernier match
+            agent = "Inconnu"
+            kda = "0/0/0"
+            map_name = "Inconnue"
+            match_score = "0-0"
+            agent_image_url = None
             
-            elif response.status == 404:
-                await interaction.followup.send(f"❌ Joueur `{nom}#{tag}` introuvable sur la région `{region}`.")
-            elif response.status == 429:
-                await interaction.followup.send("❌ L'API est surchargée (Rate Limit). Attends un peu.")
-            else:
-                await interaction.followup.send(f"❌ Erreur API ({response.status}). Vérifie ta clé API ou réessaie plus tard.")
+            async with session.get(url_match, headers=headers) as resp_match:
+                if resp_match.status == 200:
+                    data_match = await resp_match.json()
+                    if data_match.get("data") and len(data_match["data"]) > 0:
+                        match = data_match["data"][0]
+                        map_name = match.get("metadata", {}).get("map", "Inconnue")
+                        
+                        all_players = match.get("players", {}).get("all_players", [])
+                        player_team = None
+                        for p in all_players:
+                            if p.get("name", "").lower() == nom.lower() and p.get("tag", "").lower() == tag.lower():
+                                agent = p.get("character", "Inconnu")
+                                p_stats = p.get("stats", {})
+                                kda = f"{p_stats.get('kills', 0)}/{p_stats.get('deaths', 0)}/{p_stats.get('assists', 0)}"
+                                player_team = p.get("team")
+                                agent_image_url = p.get("assets", {}).get("agent", {}).get("small")
+                                break
+                        
+                        if player_team:
+                            teams = match.get("teams", {})
+                            my_team = teams.get(player_team.lower(), {})
+                            enemy_team_key = "blue" if player_team.lower() == "red" else "red"
+                            enemy_team = teams.get(enemy_team_key, {})
+                            match_score = f"{my_team.get('rounds_won', 0)}-{enemy_team.get('rounds_won', 0)}"
+
+            # 3. Construction de l'Embed
+            is_win = (changement_rr > 0)
+            result_text = "Victoire" if is_win else "Défaite" if changement_rr < 0 else "Égalité"
+            color = discord.Color.green() if is_win else discord.Color.red() if changement_rr < 0 else discord.Color.dark_gray()
+            
+            action_rr = "gagner" if is_win else "perdre" if changement_rr < 0 else "gagner"
+            phrase_desc = f"{nom} vient de {action_rr} {abs(changement_rr)} RR ({rang} {rr_actuel} RR)"
+
+            embed = discord.Embed(
+                title=f"{result_text} ({match_score})",
+                description=phrase_desc,
+                color=color
+            )
+            embed.set_author(name=f"Statistiques de {nom}#{tag}", icon_url="https://media.valorant-api.com/gamemodes/96bd3920-4f36-d026-2b28-c683eb0bcac5/displayicon.png")
+            
+            embed.add_field(name="Score", value=kda, inline=True)
+            embed.add_field(name="Agent", value=agent, inline=True)
+            embed.add_field(name="Map", value=map_name, inline=True)
+            
+            if agent_image_url:
+                embed.set_thumbnail(url=agent_image_url)
+            
+            embed.timestamp = datetime.datetime.now()
+            
+            await interaction.followup.send(embed=embed)
+            
+        except Exception as e:
+            await interaction.followup.send(f"❌ Une erreur inattendue est survenue: {e}")
