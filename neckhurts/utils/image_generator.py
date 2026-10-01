@@ -87,7 +87,7 @@ async def generate_match_image(map_name: str, agent_name: str, kda: str, rr_chan
     
     # 2. Agent Image (Left)
     if agent_img:
-        target_agent_h = int(height * 1.5)
+        target_agent_h = int(height * 1.35)
         agent_ratio = agent_img.width / agent_img.height
         target_agent_w = int(target_agent_h * agent_ratio)
         agent_img = agent_img.resize((target_agent_w, target_agent_h), Image.Resampling.LANCZOS)
@@ -106,8 +106,8 @@ async def generate_match_image(map_name: str, agent_name: str, kda: str, rr_chan
         new_alpha = ImageMath.eval("convert(min(a, b), 'L')", a=agent_mask, b=fade)
         agent_img.putalpha(new_alpha)
         
-        paste_x = -50
-        paste_y = height - target_agent_h + 30
+        paste_x = -30
+        paste_y = (height - target_agent_h) // 2
         bg.paste(agent_img, (paste_x, paste_y), agent_img)
     
     # 3. Typography

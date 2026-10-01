@@ -214,7 +214,7 @@ def build_match_embed(nom, tag, rang, mmr_change, match_score):
     color = discord.Color.from_rgb(0, 200, 120) if is_win else discord.Color.from_rgb(255, 60, 80) if not is_draw else discord.Color.from_rgb(120, 120, 120)
 
     embed = discord.Embed(
-        title=f"{result_text}  ·  {match_score}",
+        title=f"{result_text}",
         description=f"▸  **{nom}** vient de terminer une ranked",
         color=color
     )

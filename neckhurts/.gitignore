@@ -3,4 +3,5 @@ __pycache__/
 build/
 dist/
 *.pyc
-tracker_data.jsonneckhurts.exe
+tracker_data.json
+neckhurts.exe

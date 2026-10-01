@@ -148,7 +148,7 @@ async def rr(interaction: discord.Interaction, nom: str, tag: str = None, region
             file = discord.File(fp=buffer, filename="recap.png")
 
             embed = discord.Embed(
-                title=f"{result_text} ({match_score})",
+                title=f"{result_text}",
                 description=phrase_desc,
                 color=color
             )
