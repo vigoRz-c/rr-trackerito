@@ -25,3 +25,9 @@ Lors de l'ajout du récapitulatif quotidien à 9h, l'utilisation de `zoneinfo` (
 
 8. **Crash API NoneType (Valeurs Nulles)** :
 L'API Henrik renvoie parfois certaines clés (comme `assets` ou `stats`) avec la valeur explicite `null` au lieu d'un dictionnaire vide, notamment s'il y a un bug de récupération côté Riot. Le code Python plantait avec `AttributeError: 'NoneType' object has no attribute 'get'`. Il a fallu remplacer les vérifications classiques `get("key", {})` par `get("key") or {}` pour forcer l'usage d'un dictionnaire vide en cas de `None`.
+
+9. **Oubli du récapitulatif si le bot est éteint à 9h** :
+L'extension `discord.ext.tasks.loop(time=...)` s'exécute uniquement si le bot est allumé à l'heure H. Si le bot était éteint à 9h00, le récapitulatif de la veille n'était jamais envoyé. Une solution de "catch-up" (rattrapage) a été développée en stockant la date d'envoi (`last_daily_recap`) dans une clé globale `_meta` du fichier JSON. Au démarrage, le bot vérifie s'il a manqué l'envoi d'aujourd'hui et se rattrape instantanément.
+
+10. **Crash KeyError suite à l'ajout de la clé globale _meta** :
+En ajoutant la clé globale `"_meta"` dans `tracker_data.json` pour stocker des paramètres, les boucles qui itéraient sur tous les profils (`for discord_id, info in tracker_data.items()`) essayaient de lire le pseudo (`info["nom"]`) sur cet objet de configuration interne, causant des `KeyError`. Il a fallu ajouter des conditions `if user_id == "_meta": continue` partout (tracker, commandes, autocomplétion).

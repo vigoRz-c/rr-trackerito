@@ -14,10 +14,11 @@ Permet de consulter ponctuellement les statistiques d'un joueur. Elle affiche le
 Permet d'associer un compte Discord à un compte Riot Valorant et de suivre son évolution en arrière-plan.
 - **`/link <nom> <tag> <region>`** : Lier son compte Riot.
 - **`/unlink`** : Supprimer l'association.
-- **Tâche de fond (Tracker)** : Toutes les 10 minutes, le bot vérifie l'Elo des comptes enregistrés. S'il y a un changement, le bot envoie automatiquement un Embed détaillé de fin de partie dans le salon configuré.
+- **Tâche de fond (Tracker)** : Toutes les 2 minutes (délai optimisé), le bot vérifie l'Elo des comptes enregistrés. S'il y a un changement, le bot envoie automatiquement un Embed détaillé de fin de partie dans le salon configuré.
 
 ### 3. Récapitulatif Quotidien (9h00)
-- **Tâche de fond (Daily Recap)** : Tous les jours à 9h00, le bot analyse l'historique complet de la veille pour chaque joueur enregistré. Il génère un rapport montrant le nombre de victoires/défaites, le winrate, et l'évolution globale des RR sur la journée, envoyé dans le salon configuré.
+- **Tâche de fond (Daily Recap)** : Tous les jours à 9h00, le bot analyse l'historique complet de la veille pour chaque joueur enregistré. Il génère un rapport montrant le nombre de victoires/défaites, le winrate, et l'évolution globale des RR sur la journée. 
+- **Rattrapage (Catch-up)** : Si le bot est éteint à 9h00, il mémorise son retard et enverra le récapitulatif manquant instantanément dès qu'il sera rallumé.
 
 ### 4. Commandes de Test (Admins)
 - **`/test_game`** : Simule artificiellement un changement d'ELO pour tester l'annonce automatique du tracker.
@@ -33,12 +34,13 @@ HENRIK_API_KEY=votre_cle_api_henrik
 TRACKER_CHANNEL_ID=123456789012345678 # ID du salon où le bot doit annoncer les changements de RR
 ```
 3. Installez les dépendances : 
-   `pip install discord.py python-dotenv aiohttp`
+   `pip install -r requirements.txt`
 4. Lancez `neckhurts.exe` ou recompilez-le avec `pyinstaller neckhurts.spec`.
 
-## Fichiers de données
-Les joueurs sont stockés dans le fichier `tracker_data.json` à la racine.
+## Fichiers de données et Architecture
+Le projet respecte les conventions `discord.py` avec le code des commandes rangé dans le dossier `cogs/`.
+Les joueurs et la mémoire interne (comme la date du dernier récapitulatif) sont stockés dans le fichier protégé `data/tracker_data.json`.
 
 ## Dépannage (Erreurs courantes)
-- **L'exécutable se ferme instantanément** : Assurez-vous que le fichier `.env` est présent avec votre token. 
+- **L'exécutable se ferme instantanément** : Assurez-vous que le fichier `.env` est présent avec votre token et que le dossier `data/` a bien les droits d'écriture. 
 - **PyInstaller & Fuseaux Horaires** : L'utilisation du module `zoneinfo` peut faire crasher PyInstaller sur Windows s'il n'arrive pas à compiler la base `tzdata`. Le code utilise un décalage horaire en dur (UTC+2) pour éviter ce problème.
