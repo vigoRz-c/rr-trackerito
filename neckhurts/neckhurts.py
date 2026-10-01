@@ -17,6 +17,7 @@ TOKEN = os.getenv("DISCORD_TOKEN")
 
 from cogs.commande_rr import rr
 from cogs.tracker import link, unlink, TrackerTask, load_data, save_data
+from cogs.classement import classement
 if not TOKEN:
     raise ValueError("❌ Le token Discord n'a pas été trouvé dans la variable d'environnement DISCORD_TOKEN")
 
@@ -45,6 +46,7 @@ client = MyClient(intents=intents)
 client.tree.add_command(rr)
 client.tree.add_command(link)
 client.tree.add_command(unlink)
+client.tree.add_command(classement)
 
 @app_commands.command(name="test_game", description="[Admin] Simule une fin de partie pour tester l'affichage")
 async def test_game(interaction: discord.Interaction):

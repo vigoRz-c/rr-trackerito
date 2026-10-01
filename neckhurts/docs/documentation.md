@@ -18,7 +18,13 @@ Permet d'associer un compte Discord à un compte Riot Valorant et de suivre son 
   - L'embed affiche : **Rang actuel + emoji de rang**, **bannière du rang en image principale**, **miniature de l'agent**, **KDA**, **ACS** (Average Combat Score), **HS%** (Headshot %), **Map**, **nombre de rounds**, et le **changement de RR** mis en valeur.
   - Un **bouton interactif** « 🕹️ 5 dernières games » est attaché à chaque message : en cliquant dessus, le joueur reçoit un récapitulatif éphémère de ses 5 dernières parties (agent, KDA, ACS, HS%, score).
 
-### 3. Récapitulatif Quotidien (9h00)
+### 3. Commande `/classement` (Leaderboard)
+Affiche le classement en temps réel de tous les membres enregistrés via `/link`.
+- Le bot interroge l'API HenrikDev pour chaque joueur et trie par ELO décroissant.
+- L'embed affiche : position (🥇🥈🥉 pour le podium), pseudo#tag, rang actuel et RR.
+- Les joueurs dont l'API est indisponible apparaissent en bas du classement avec `—`.
+
+### 4. Récapitulatif Quotidien (9h00)
 - **Tâche de fond (Daily Recap)** : Tous les jours à 9h00, le bot analyse l'historique complet de la veille pour chaque joueur enregistré. Il génère un rapport montrant le nombre de victoires/défaites (avec emojis ✅/❌), le winrate, l'évolution globale des RR et la progression de rang (avant → après). 
 - **Rattrapage (Catch-up)** : Si le bot est éteint à 9h00, il mémorise son retard et enverra le récapitulatif manquant instantanément dès qu'il sera rallumé.
 
