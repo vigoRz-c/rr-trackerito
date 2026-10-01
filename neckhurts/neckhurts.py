@@ -7,8 +7,8 @@ from discord import app_commands
 load_dotenv()
 TOKEN = os.getenv("DISCORD_TOKEN")
 
-from sous_fonctions.commande_rr import rr
-from sous_fonctions.tracker import link, unlink, TrackerTask, load_data, save_data
+from cogs.commande_rr import rr
+from cogs.tracker import link, unlink, TrackerTask, load_data, save_data
 if not TOKEN:
     raise ValueError("❌ Le token Discord n'a pas été trouvé dans la variable d'environnement DISCORD_TOKEN")
 

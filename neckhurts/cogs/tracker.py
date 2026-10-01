@@ -6,7 +6,8 @@ import os
 import json
 import datetime
 
-DATA_FILE = "tracker_data.json"
+os.makedirs("data", exist_ok=True)
+DATA_FILE = "data/tracker_data.json"
 HENRIK_API_KEY = os.getenv("HENRIK_API_KEY")
 
 # Charger les donnees ou creer un dico vide

@@ -5,7 +5,7 @@ a = Analysis(
     ['neckhurts.py'],
     pathex=[],
     binaries=[],
-    datas=[('sous_fonctions', 'sous_fonctions')],
+    datas=[('cogs', 'cogs')],
     hiddenimports=['discord', 'dotenv', 'aiohttp'],
     hookspath=[],
     hooksconfig={},

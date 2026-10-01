@@ -3,7 +3,7 @@ from discord import app_commands
 import aiohttp
 import os
 import datetime
-from sous_fonctions.tracker import load_data
+from cogs.tracker import load_data
 
 HENRIK_API_KEY = os.getenv("HENRIK_API_KEY")
 
