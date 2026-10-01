@@ -133,12 +133,7 @@ def build_match_embed(nom, tag, rang, mmr_change, current_elo):
     result_text = "VICTOIRE" if is_win else "DÉFAITE" if not is_draw else "EGALITE"
     color = discord.Color.from_rgb(0, 200, 120) if is_win else discord.Color.from_rgb(255, 60, 80) if not is_draw else discord.Color.from_rgb(120, 120, 120)
 
-    if mmr_change > 0:
-        desc = f"▶ {nom} a gagné {mmr_change} RR ({rang} {current_elo} RR)"
-    elif mmr_change < 0:
-        desc = f"▶ {nom} a perdu {abs(mmr_change)} RR ({rang} {current_elo} RR)"
-    else:
-        desc = f"▶ {nom} n'a gagné aucun RR ({rang} {current_elo} RR)"
+    desc = f"▶ {nom} — {rang} {current_elo} RR"
 
     embed = discord.Embed(
         title=f"{result_text}",
