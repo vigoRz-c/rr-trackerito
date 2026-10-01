@@ -496,7 +496,7 @@ class TrackerTask:
         end_ts = int(end_of_yesterday.timestamp())
         
         embed = discord.Embed(
-            title=f"📊 Récapitulatif du {yesterday.strftime('%d/%m/%Y')}",
+            title=f"Recap du {yesterday.strftime('%d/%m/%Y')}",
             color=discord.Color.from_rgb(160, 100, 255)
         )
         embed.set_author(
