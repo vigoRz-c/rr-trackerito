@@ -124,15 +124,15 @@ async def rr(interaction: discord.Interaction, nom: str, tag: str = None, region
                             match_score = f"{my_team.get('rounds_won', 0)}-{enemy_team.get('rounds_won', 0)}"
                             nb_rounds = my_team.get('rounds_won', 0) + enemy_team.get('rounds_won', 0)
                             
-                        # Le CS est la valeur brute du score, sans division par nb_rounds
-                        cs = score_raw
+                        # Le Performance Score sur l'échelle 0-500 correspond à la moyenne du score par round (l'ancien ACS)
+                        perf = round(score_raw / nb_rounds) if nb_rounds > 0 else 0
                         adr = round(damage_made / nb_rounds) if nb_rounds > 0 else 0
                         
                         stats_dict = {
                             "hs_pct": hs_pct,
                             "kd": kd,
                             "adr": adr,
-                            "acs": cs
+                            "perf": perf
                         }
 
             # 3. Construction de l'Embed et de l'Image

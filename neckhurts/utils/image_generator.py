@@ -157,12 +157,12 @@ async def generate_match_image(map_name: str, agent_name: str, kda: str, rr_chan
     hs_pct = stats.get("hs_pct", "N/A")
     kd_val = stats.get("kd", "N/A")
     adr_val = stats.get("adr", "N/A")
-    cst_val = stats.get("acs", "N/A")  # ACS is now CSt
+    perf_val = stats.get("perf", "N/A")  
     
     hs_str = f"{hs_pct}%" if isinstance(hs_pct, (int, float)) else str(hs_pct)
     kd_str = f"{kd_val:.2f}" if isinstance(kd_val, (int, float)) else str(kd_val)
     adr_str = str(adr_val)
-    cst_str = str(cst_val)
+    perf_str = str(perf_val)
 
     # We can widen the column slightly to make sure it looks spaced out
     col_width = 85
@@ -171,14 +171,14 @@ async def generate_match_image(map_name: str, agent_name: str, kda: str, rr_chan
     draw.text((text_x, grid_y), "HS%", fill=(170, 170, 170, 255), font=font_stat_lbl)
     draw.text((text_x + col_width, grid_y), "K/D", fill=(170, 170, 170, 255), font=font_stat_lbl)
     draw.text((text_x + 2*col_width, grid_y), "ADR", fill=(170, 170, 170, 255), font=font_stat_lbl)
-    draw.text((text_x + 3*col_width + 10, grid_y), "CSt", fill=(170, 170, 170, 255), font=font_stat_lbl)
+    draw.text((text_x + 3*col_width + 10, grid_y), "Perf", fill=(170, 170, 170, 255), font=font_stat_lbl)
     
     # Row 2 Values
     val_y = grid_y + 25
     draw.text((text_x, val_y), hs_str, fill=(255, 255, 255, 255), font=font_stat_val)
     draw.text((text_x + col_width, val_y), kd_str, fill=(255, 255, 255, 255), font=font_stat_val)
     draw.text((text_x + 2*col_width, val_y), adr_str, fill=(255, 255, 255, 255), font=font_stat_val)
-    draw.text((text_x + 3*col_width + 10, val_y), cst_str, fill=(255, 255, 255, 255), font=font_stat_val)
+    draw.text((text_x + 3*col_width + 10, val_y), perf_str, fill=(255, 255, 255, 255), font=font_stat_val)
     
     buffer = io.BytesIO()
     bg.convert("RGB").save(buffer, format="PNG", quality=95)
