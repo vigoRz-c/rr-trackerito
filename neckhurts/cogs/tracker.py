@@ -90,7 +90,7 @@ class TrackerTask:
         self.tracker_loop.cancel()
         self.daily_recap.cancel()
 
-    @tasks.loop(minutes=10.0)
+    @tasks.loop(minutes=2.0)
     async def tracker_loop(self):
         if not HENRIK_API_KEY:
             return
