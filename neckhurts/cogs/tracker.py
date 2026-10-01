@@ -116,86 +116,6 @@ def rank_emoji(rang: str) -> str:
 
 
 # ─── Vue "5 dernières games" ─────────────────────────────────────────────────
-class DernieresGamesView(discord.ui.View):
-    def __init__(self, nom: str, tag: str, region: str):
-        super().__init__(timeout=120)
-        self.nom = nom
-        self.tag = tag
-        self.region = region
-
-    @discord.ui.button(label="🕹️ 5 dernières games", style=discord.ButtonStyle.secondary)
-    async def show_last_games(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.defer(ephemeral=True)
-        button.disabled = True
-        try:
-            await interaction.message.edit(view=self)
-        except Exception:
-            pass
-
-        headers = {"Authorization": HENRIK_API_KEY}
-        url = f"https://api.henrikdev.xyz/valorant/v3/matches/{self.region}/{self.nom}/{self.tag}?size=5"
-
-        try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(url, headers=headers) as resp:
-                    if resp.status != 200:
-                        await interaction.followup.send("❌ Impossible de récupérer l'historique.", ephemeral=True)
-                        return
-                    data = await resp.json()
-                    matches = data.get("data") or []
-
-            if not matches:
-                await interaction.followup.send("❌ Aucune partie trouvée.", ephemeral=True)
-                return
-
-            embed = discord.Embed(
-                title=f"🕹️ 5 dernières parties de {self.nom}#{self.tag}",
-                color=discord.Color.from_rgb(255, 70, 85)
-            )
-
-            for i, match in enumerate(matches, 1):
-                meta = match.get("metadata") or {}
-                map_name = meta.get("map", "?")
-                total_rounds = meta.get("rounds_played") or 0
-
-                players_dict = match.get("players") or {}
-                all_players = players_dict.get("all_players", [])
-
-                ps = extract_player_stats(all_players, self.nom, self.tag)
-                if not ps:
-                    continue
-
-                acs = compute_acs(ps["score_raw"], total_rounds)
-
-                teams = match.get("teams") or {}
-                player_team = ps.get("team", "")
-                my_team = teams.get(player_team.lower()) or {}
-                enemy_key = "blue" if player_team.lower() == "red" else "red"
-                enemy_team = teams.get(enemy_key) or {}
-                my_r = my_team.get("rounds_won", 0)
-                en_r = enemy_team.get("rounds_won", 0)
-                score_str = f"{my_r}-{en_r}"
-
-                won = my_team.get("has_won", False)
-                result_label = "Victoire" if won else "Défaite"
-
-                embed.add_field(
-                    name=f"{result_label} {i} — {map_name}",
-                    value=(
-                        f"**Agent:** {ps['agent']}  |  **KDA:** {ps['kda']}  |  "
-                        f"**ACS:** {acs}  |  **HS%:** {ps['hs_pct']}%  |  **Score:** {score_str}"
-                    ),
-                    inline=False
-                )
-
-            embed.set_footer(text="RR Trackerito  •  Données via HenrikDev")
-            embed.timestamp = datetime.datetime.now()
-            await interaction.followup.send(embed=embed, ephemeral=True)
-
-        except Exception as e:
-            await interaction.followup.send(f"❌ Erreur : {e}", ephemeral=True)
-
-
 # ─── Barre de progression RR ─────────────────────────────────────────────────
 def rr_progress_bar(rr: int, total: int = 100, length: int = 12) -> str:
     """Génère une barre de progression ASCII pour les RR."""
@@ -429,14 +349,13 @@ class TrackerTask:
                             nom=nom, tag=tag, rang=player_data["rang"],
                             mmr_change=player_data["mmr_change"], match_score=match_score
                         )
-                        view = DernieresGamesView(nom=nom, tag=tag, region=region)
                         
                         if channel:
-                            await channel.send(embed=embed, file=file, view=view)
+                            await channel.send(embed=embed, file=file)
                         else:
                             user = self.client.get_user(int(discord_id))
                             if user:
-                                try: await user.send(embed=embed, file=file, view=view)
+                                try: await user.send(embed=embed, file=file)
                                 except: pass
                                 
                     tracker_data[discord_id]["last_match_id"] = match_id
