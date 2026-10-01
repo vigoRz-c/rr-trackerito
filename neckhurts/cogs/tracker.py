@@ -110,6 +110,8 @@ class TrackerTask:
         
         async with aiohttp.ClientSession() as session:
             for discord_id, info in tracker_data.items():
+                if discord_id == "_meta":
+                    continue
                 nom = info["nom"]
                 tag = info["tag"]
                 region = info["region"]
@@ -210,13 +212,35 @@ class TrackerTask:
                                 
                 except Exception as e:
                     print(f"Erreur Tracker pour {nom}#{tag} : {e}")
-                    
+
+        # Rattrapage du Daily Recap si on a depasse 9h et qu'il n'a pas ete envoye aujourd'hui
+        now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=2)))
+        if now.hour >= 9:
+            today_str = now.strftime("%Y-%m-%d")
+            meta = tracker_data.get("_meta", {})
+            if meta.get("last_daily_recap") != today_str:
+                await self.execute_daily_recap()
+                meta["last_daily_recap"] = today_str
+                tracker_data["_meta"] = meta
+                save_data(tracker_data)
+
     @tracker_loop.before_loop
     async def before_tracker_loop(self):
         await self.client.wait_until_ready()
 
     @tasks.loop(time=datetime.time(hour=9, minute=0, tzinfo=datetime.timezone(datetime.timedelta(hours=2))))
     async def daily_recap(self):
+        # Marquer comme envoye
+        tracker_data = load_data()
+        now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=2)))
+        meta = tracker_data.get("_meta", {})
+        meta["last_daily_recap"] = now.strftime("%Y-%m-%d")
+        tracker_data["_meta"] = meta
+        save_data(tracker_data)
+        
+        await self.execute_daily_recap()
+        
+    async def execute_daily_recap(self):
         if not HENRIK_API_KEY:
             return
             
@@ -251,6 +275,8 @@ class TrackerTask:
         
         async with aiohttp.ClientSession() as session:
             for discord_id, info in tracker_data.items():
+                if discord_id == "_meta":
+                    continue
                 nom = info["nom"]
                 tag = info["tag"]
                 region = info["region"]

@@ -45,6 +45,7 @@ async def test_game(interaction: discord.Interaction):
     # Triche: on baisse artificiellement le ELO en memoire pour forcer la detection
     tracker_data = load_data()
     for user_id in tracker_data:
+        if user_id == "_meta": continue
         tracker_data[user_id]["last_elo"] = max(0, tracker_data[user_id].get("last_elo", 1000) - 20)
     save_data(tracker_data)
     await client.tracker_task.tracker_loop.coro(client.tracker_task)

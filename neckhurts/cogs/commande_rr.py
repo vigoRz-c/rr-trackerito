@@ -11,7 +11,9 @@ async def autocomplete_nom(interaction: discord.Interaction, current: str) -> li
     tracker_data = load_data()
     choices = []
     vus = set()
-    for info in tracker_data.values():
+    for user_id, info in tracker_data.items():
+        if user_id == "_meta":
+            continue
         nom = info["nom"]
         if current.lower() in nom.lower() and nom not in vus:
             vus.add(nom)
@@ -25,7 +27,9 @@ async def rr(interaction: discord.Interaction, nom: str, tag: str = None, region
     
     if tag is None:
         tracker_data = load_data()
-        for info in tracker_data.values():
+        for user_id, info in tracker_data.items():
+            if user_id == "_meta":
+                continue
             if info["nom"].lower() == nom.lower():
                 tag = info["tag"]
                 break
