@@ -125,19 +125,75 @@ class TrackerTask:
                                 rang = data_api.get("currenttierpatched", "Inconnu")
                                 rr_actuel = data_api.get("ranking_in_tier", 0)
                                 
-                                symbole = "📈" if diff > 0 else "📉" if diff < 0 else "➖"
-                                message = f"<@{discord_id}> ({nom}#{tag}) vient de terminer une partie !\n"
-                                message += f"> **Changement** : {symbole} {mmr_change} RR\n"
-                                message += f"> **Rang actuel** : {rang} ({rr_actuel} RR)\n"
+                                # Fetch du dernier match pour récupérer Score, Agent et Map
+                                match_url = f"https://api.henrikdev.xyz/valorant/v3/matches/{region}/{nom}/{tag}?size=1"
+                                agent = "Inconnu"
+                                kda = "0/0/0"
+                                map_name = "Inconnue"
+                                match_score = "0-0"
+                                agent_image_url = None
+                                is_win = (diff > 0)
+                                result_text = "Victoire" if is_win else "Défaite" if diff < 0 else "Égalité"
+                                color = discord.Color.green() if is_win else discord.Color.red() if diff < 0 else discord.Color.dark_gray()
+                                
+                                try:
+                                    async with session.get(match_url, headers=headers) as match_resp:
+                                        if match_resp.status == 200:
+                                            match_data = await match_resp.json()
+                                            if match_data.get("data") and len(match_data["data"]) > 0:
+                                                match = match_data["data"][0]
+                                                map_name = match.get("metadata", {}).get("map", "Inconnue")
+                                                
+                                                all_players = match.get("players", {}).get("all_players", [])
+                                                player_team = None
+                                                for p in all_players:
+                                                    if p.get("name", "").lower() == nom.lower() and p.get("tag", "").lower() == tag.lower():
+                                                        agent = p.get("character", "Inconnu")
+                                                        stats = p.get("stats", {})
+                                                        kda = f"{stats.get('kills', 0)}/{stats.get('deaths', 0)}/{stats.get('assists', 0)}"
+                                                        player_team = p.get("team")
+                                                        agent_image_url = p.get("assets", {}).get("agent", {}).get("small")
+                                                        break
+                                                
+                                                if player_team:
+                                                    teams = match.get("teams", {})
+                                                    my_team = teams.get(player_team.lower(), {})
+                                                    enemy_team_key = "blue" if player_team.lower() == "red" else "red"
+                                                    enemy_team = teams.get(enemy_team_key, {})
+                                                    my_rounds = my_team.get("rounds_won", 0)
+                                                    enemy_rounds = enemy_team.get("rounds_won", 0)
+                                                    match_score = f"{my_rounds}-{enemy_rounds}"
+                                except Exception as e:
+                                    print(f"Erreur lors de la récupération du match pour {nom}#{tag}: {e}")
+
+                                action_rr = "gagner" if diff > 0 else "perdre" if diff < 0 else "gagner"
+                                phrase_desc = f"{nom} vient de {action_rr} {abs(mmr_change)} RR ({rang} {rr_actuel} RR)"
+                                
+                                embed = discord.Embed(
+                                    title=f"{result_text} ({match_score})",
+                                    description=phrase_desc,
+                                    color=color
+                                )
+                                embed.set_author(name="Résultat de la partie", icon_url="https://media.valorant-api.com/gamemodes/96bd3920-4f36-d026-2b28-c683eb0bcac5/displayicon.png")
+                                
+                                embed.add_field(name="Score", value=kda, inline=True)
+                                embed.add_field(name="Agent", value=agent, inline=True)
+                                embed.add_field(name="Map", value=map_name, inline=True)
+                                
+                                if agent_image_url:
+                                    embed.set_thumbnail(url=agent_image_url)
+                                
+                                import datetime
+                                embed.timestamp = datetime.datetime.now()
                                 
                                 if channel:
-                                    await channel.send(message)
+                                    await channel.send(embed=embed)
                                 else:
                                     # Si pas de salon defini, on essaie d'envoyer en MP
                                     user = self.client.get_user(int(discord_id))
                                     if user:
                                         try:
-                                            await user.send(message)
+                                            await user.send(embed=embed)
                                         except:
                                             pass
                                 

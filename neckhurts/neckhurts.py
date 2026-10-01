@@ -3,7 +3,6 @@ import discord
 from dotenv import load_dotenv
 from discord import app_commands
 
-from sous_fonctions.commande_infos import infos
 from sous_fonctions.commande_rr import rr
 from sous_fonctions.tracker import link, unlink, TrackerTask
 
@@ -28,7 +27,7 @@ class MyClient(discord.Client):
         await self.tree.sync()
 
     async def on_ready(self):
-        print(f"✅ Connecté en tant que {self.user}")
+        print(f"[SUCCESS] Connecté en tant que {self.user}")
 
 
 
@@ -36,7 +35,6 @@ class MyClient(discord.Client):
 client = MyClient(intents=intents)
 
 # ========== COMMANDES SLASH ==========
-client.tree.add_command(infos)
 client.tree.add_command(rr)
 client.tree.add_command(link)
 client.tree.add_command(unlink)
