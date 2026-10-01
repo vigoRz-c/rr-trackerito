@@ -403,7 +403,7 @@ class TrackerTask:
                             enemy_team = teams.get(enemy_key) or {}
                             match_score = f"{my_team.get('rounds_won', 0)}-{enemy_team.get('rounds_won', 0)}"
                         
-                        buffer = generate_match_image(map_name, agent, kda, player_data["mmr_change"])
+                        buffer = await generate_match_image(map_name, agent, kda, player_data["mmr_change"])
                         file = discord.File(fp=buffer, filename="recap.png")
                         
                         embed = build_match_embed(

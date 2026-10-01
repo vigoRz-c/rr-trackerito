@@ -1,65 +1,118 @@
-import os
 import io
+import aiohttp
+import asyncio
 from PIL import Image, ImageDraw, ImageFont
 
-def generate_match_image(map_name: str, agent_name: str, kda: str, rr_change: int) -> io.BytesIO:
-    """Génère une image premium récapitulative de la partie."""
+async def fetch_image(url: str, session: aiohttp.ClientSession) -> Image.Image:
+    try:
+        async with session.get(url) as resp:
+            if resp.status == 200:
+                data = await resp.read()
+                return Image.open(io.BytesIO(data)).convert("RGBA")
+    except Exception as e:
+        print(f"Erreur téléchargement image {url}: {e}")
+    return None
+
+async def get_map_image(map_name: str, session: aiohttp.ClientSession) -> Image.Image:
+    try:
+        url = "https://valorant-api.com/v1/maps"
+        async with session.get(url) as resp:
+            if resp.status == 200:
+                data = await resp.json()
+                for m in data.get("data", []):
+                    if m.get("displayName", "").lower() == map_name.lower():
+                        splash_url = m.get("splash")
+                        if splash_url:
+                            return await fetch_image(splash_url, session)
+    except Exception as e:
+        print(f"Erreur get_map_image: {e}")
+    return None
+
+async def get_agent_image(agent_name: str, session: aiohttp.ClientSession) -> Image.Image:
+    try:
+        url = "https://valorant-api.com/v1/agents?isPlayableCharacter=true"
+        async with session.get(url) as resp:
+            if resp.status == 200:
+                data = await resp.json()
+                for a in data.get("data", []):
+                    if a.get("displayName", "").lower() == agent_name.lower():
+                        display_url = a.get("displayIcon")
+                        if display_url:
+                            return await fetch_image(display_url, session)
+    except Exception as e:
+        print(f"Erreur get_agent_image: {e}")
+    return None
+
+async def generate_match_image(map_name: str, agent_name: str, kda: str, rr_change: int) -> io.BytesIO:
+    """Génère une image premium récapitulative de la partie avec les assets API."""
     width, height = 800, 400
     
-    # Paths for assets
-    map_path = f"assets/maps/{map_name.lower()}.png"
-    agent_path = f"assets/agents/{agent_name.lower()}.png"
-    
-    # 1. Background
-    if os.path.exists(map_path):
-        try:
-            bg = Image.open(map_path).convert("RGBA")
-            bg = bg.resize((width, height))
-        except Exception:
-            bg = Image.new("RGBA", (width, height), (40, 44, 52, 255))
-    else:
-        bg = Image.new("RGBA", (width, height), (40, 44, 52, 255))
+    async with aiohttp.ClientSession() as session:
+        map_task = asyncio.create_task(get_map_image(map_name, session))
+        agent_task = asyncio.create_task(get_agent_image(agent_name, session))
+        map_img, agent_img = await asyncio.gather(map_task, agent_task)
 
-    # Dark overlay to make text pop
-    overlay = Image.new("RGBA", (width, height), (0, 0, 0, 150))
+    # 1. Background
+    if map_img:
+        map_ratio = map_img.width / map_img.height
+        target_ratio = width / height
+        
+        if map_ratio > target_ratio:
+            new_height = height
+            new_width = int(new_height * map_ratio)
+            map_img = map_img.resize((new_width, new_height), Image.Resampling.LANCZOS)
+            left = (new_width - width) / 2
+            map_img = map_img.crop((left, 0, left + width, height))
+        else:
+            new_width = width
+            new_height = int(new_width / map_ratio)
+            map_img = map_img.resize((new_width, new_height), Image.Resampling.LANCZOS)
+            top = (new_height - height) / 2
+            map_img = map_img.crop((0, top, width, top + height))
+            
+        bg = map_img.convert("RGBA")
+    else:
+        bg = Image.new("RGBA", (width, height), (30, 34, 42, 255))
+
+    # Dark overlay
+    overlay = Image.new("RGBA", (width, height), (0, 0, 0, 160))
     bg = Image.alpha_composite(bg, overlay)
     draw = ImageDraw.Draw(bg)
     
     # 2. Agent Image
-    if os.path.exists(agent_path):
-        try:
-            agent_img = Image.open(agent_path).convert("RGBA")
-            agent_img.thumbnail((350, 350))
-            # Center the agent image on the left side
-            bg.paste(agent_img, (20, height - agent_img.height), agent_img)
-        except Exception:
-            pass
+    if agent_img:
+        agent_img.thumbnail((380, 380), Image.Resampling.LANCZOS)
+        paste_x = 20
+        paste_y = height - agent_img.height
+        bg.paste(agent_img, (paste_x, paste_y), agent_img)
     
     # 3. Typography
     try:
-        font_large = ImageFont.truetype("arial.ttf", 60)
-        font_medium = ImageFont.truetype("arial.ttf", 40)
-        font_small = ImageFont.truetype("arial.ttf", 25)
+        try:
+            font_title = ImageFont.truetype("arialbd.ttf", 65)
+            font_kda = ImageFont.truetype("arialbd.ttf", 55)
+            font_small = ImageFont.truetype("arial.ttf", 28)
+        except:
+            font_title = ImageFont.truetype("arial.ttf", 65)
+            font_kda = ImageFont.truetype("arial.ttf", 55)
+            font_small = ImageFont.truetype("arial.ttf", 28)
     except IOError:
-        font_large = ImageFont.load_default()
-        font_medium = ImageFont.load_default()
+        font_title = ImageFont.load_default()
+        font_kda = ImageFont.load_default()
         font_small = ImageFont.load_default()
         
-    # Text Placement
-    text_x = 400
-    draw.text((text_x, 80), "KDA", fill=(200, 200, 200, 255), font=font_medium)
-    draw.text((text_x, 130), kda, fill=(255, 255, 255, 255), font=font_large)
+    text_x = 420
+    info_text = f"{map_name.upper()} • {agent_name.upper()}"
+    draw.text((text_x, 60), info_text, fill=(200, 200, 200, 255), font=font_small)
+    
+    draw.text((text_x, 110), f"KDA: {kda}", fill=(255, 255, 255, 255), font=font_kda)
     
     sign = "+" if rr_change > 0 else ""
-    color = (100, 255, 100, 255) if rr_change > 0 else (255, 100, 100, 255) if rr_change < 0 else (200, 200, 200, 255)
-    rr_text = f"RR: {sign}{rr_change}"
-    draw.text((text_x, 220), rr_text, fill=color, font=font_large)
+    color = (80, 255, 120, 255) if rr_change > 0 else (255, 80, 80, 255) if rr_change < 0 else (200, 200, 200, 255)
+    rr_text = f"{sign}{rr_change} RR"
+    draw.text((text_x, 210), rr_text, fill=color, font=font_title)
     
-    info_text = f"Map: {map_name}  |  Agent: {agent_name}"
-    draw.text((text_x, 320), info_text, fill=(180, 180, 180, 255), font=font_small)
-    
-    # Export to bytes
     buffer = io.BytesIO()
-    bg.convert("RGB").save(buffer, format="PNG")
+    bg.convert("RGB").save(buffer, format="PNG", quality=95)
     buffer.seek(0)
     return buffer

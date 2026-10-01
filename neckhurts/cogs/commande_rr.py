@@ -118,7 +118,7 @@ async def rr(interaction: discord.Interaction, nom: str, tag: str = None, region
             phrase_desc = f"{nom} vient de {action_rr} {abs(changement_rr)} RR ({rang} {rr_actuel} RR)"
 
             from utils.image_generator import generate_match_image
-            buffer = generate_match_image(map_name, agent, kda, changement_rr)
+            buffer = await generate_match_image(map_name, agent, kda, changement_rr)
             file = discord.File(fp=buffer, filename="recap.png")
 
             embed = discord.Embed(
