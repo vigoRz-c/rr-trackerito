@@ -3,10 +3,9 @@ import discord
 from dotenv import load_dotenv
 from discord import app_commands
 
-from sous_fonctions.commande_gay import gay
 from sous_fonctions.commande_infos import infos
-from sous_fonctions.commande_mimic import mimic
-from sous_fonctions.auto_reponse import on_message, repondre, ORTHOGRAPHE_NEZ
+from sous_fonctions.commande_rr import rr
+from sous_fonctions.tracker import link, unlink, TrackerTask
 
 # ========== CONFIGURATION & VARIABLES ==========
 load_dotenv()
@@ -25,22 +24,22 @@ class MyClient(discord.Client):
         self.tree = app_commands.CommandTree(self)
 
     async def setup_hook(self):
+        self.tracker_task = TrackerTask(self)
         await self.tree.sync()
 
     async def on_ready(self):
         print(f"✅ Connecté en tant que {self.user}")
 
-    # Import des méthodes auto-réponse
-    on_message = on_message
-    repondre = repondre
+
 
 
 client = MyClient(intents=intents)
 
 # ========== COMMANDES SLASH ==========
 client.tree.add_command(infos)
-client.tree.add_command(gay)
-client.tree.add_command(mimic)
+client.tree.add_command(rr)
+client.tree.add_command(link)
+client.tree.add_command(unlink)
 
 # ========== LANCEMENT ==========
 client.run(TOKEN)
