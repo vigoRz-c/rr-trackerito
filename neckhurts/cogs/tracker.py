@@ -207,8 +207,8 @@ def build_match_embed(nom, tag, rang, rr_actuel, mmr_change, diff,
                       acs, hs_pct, nb_rounds):
     # On utilise mmr_change (changement RR de la dernière game) et non diff
     # (diff = écart ELO global depuis la dernière vérif, faussé si plusieurs games jouées)
-    is_win = mmr_change > 0
-    is_draw = mmr_change == 0
+    is_win = mmr_change > 1
+    is_draw = mmr_change == 0   
     result_text = "VICTOIRE" if is_win else "DÉFAITE" if not is_draw else "ÉGALITÉ"
     color = discord.Color.from_rgb(0, 200, 120) if is_win else discord.Color.from_rgb(255, 60, 80) if not is_draw else discord.Color.from_rgb(120, 120, 120)
 
@@ -217,7 +217,7 @@ def build_match_embed(nom, tag, rang, rr_actuel, mmr_change, diff,
 
     embed = discord.Embed(
         title=f"{result_text}  ·  {match_score}",
-        description=f"▸  **{nom}** vient de terminer une partie classée",
+        description=f"▸  **{nom}** vient de terminer une ranked",
         color=color
     )
     embed.set_author(
