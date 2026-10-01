@@ -4,6 +4,8 @@ from discord.ext import tasks
 import aiohttp
 import os
 import json
+import datetime
+import zoneinfo
 
 DATA_FILE = "tracker_data.json"
 HENRIK_API_KEY = os.getenv("HENRIK_API_KEY")
@@ -82,9 +84,11 @@ class TrackerTask:
         self.client = client
         self.channel_id = os.getenv("TRACKER_CHANNEL_ID")
         self.tracker_loop.start()
+        self.daily_recap.start()
 
     def cog_unload(self):
         self.tracker_loop.cancel()
+        self.daily_recap.cancel()
 
     @tasks.loop(minutes=10.0)
     async def tracker_loop(self):
@@ -183,7 +187,6 @@ class TrackerTask:
                                 if agent_image_url:
                                     embed.set_thumbnail(url=agent_image_url)
                                 
-                                import datetime
                                 embed.timestamp = datetime.datetime.now()
                                 
                                 if channel:
@@ -206,4 +209,110 @@ class TrackerTask:
                     
     @tracker_loop.before_loop
     async def before_tracker_loop(self):
+        await self.client.wait_until_ready()
+
+    @tasks.loop(time=datetime.time(hour=9, minute=0, tzinfo=zoneinfo.ZoneInfo("Europe/Paris")))
+    async def daily_recap(self):
+        if not HENRIK_API_KEY:
+            return
+            
+        tracker_data = load_data()
+        if not tracker_data:
+            return
+            
+        channel = None
+        if self.channel_id:
+            try:
+                channel = self.client.get_channel(int(self.channel_id))
+            except:
+                pass
+        
+        if not channel:
+            return
+            
+        headers = {"Authorization": HENRIK_API_KEY}
+        
+        now = datetime.datetime.now(zoneinfo.ZoneInfo("Europe/Paris"))
+        yesterday = now - datetime.timedelta(days=1)
+        start_of_yesterday = yesterday.replace(hour=0, minute=0, second=0, microsecond=0)
+        end_of_yesterday = yesterday.replace(hour=23, minute=59, second=59, microsecond=999999)
+        
+        start_ts = int(start_of_yesterday.timestamp())
+        end_ts = int(end_of_yesterday.timestamp())
+        
+        embed = discord.Embed(title="", color=discord.Color.magenta())
+        embed.set_author(name="Récapitulatif de la veille", icon_url="https://media.valorant-api.com/competitivetiers/03621f52-342b-cf4e-4f86-9350a49c6d04/24/largeicon.png")
+        
+        has_data = False
+        
+        async with aiohttp.ClientSession() as session:
+            for discord_id, info in tracker_data.items():
+                nom = info["nom"]
+                tag = info["tag"]
+                region = info["region"]
+                
+                url = f"https://api.henrikdev.xyz/valorant/v1/mmr-history/{region}/{nom}/{tag}"
+                try:
+                    async with session.get(url, headers=headers) as response:
+                        if response.status == 200:
+                            data_api = (await response.json()).get("data", [])
+                            
+                            yesterday_matches = [m for m in data_api if start_ts <= m.get("date_raw", 0) <= end_ts]
+                            if not yesterday_matches:
+                                continue
+                                
+                            yesterday_matches.sort(key=lambda x: x.get("date_raw", 0))
+                            
+                            wins = 0
+                            losses = 0
+                            draws = 0
+                            total_rr = 0
+                            
+                            for m in yesterday_matches:
+                                rr_change = m.get("mmr_change_to_last_game", 0)
+                                total_rr += rr_change
+                                if rr_change > 0:
+                                    wins += 1
+                                elif rr_change < 0:
+                                    losses += 1
+                                else:
+                                    draws += 1
+                                    
+                            total_games = wins + losses + draws
+                            winrate = round((wins / total_games) * 100, 1) if total_games > 0 else 0
+                            
+                            end_match = yesterday_matches[-1]
+                            end_tier = end_match.get("currenttierpatched", "Inconnu")
+                            end_rr = end_match.get("ranking_in_tier", 0)
+                            end_str = f"{end_tier} {end_rr}rr"
+                            
+                            oldest_match_index = data_api.index(yesterday_matches[0])
+                            if oldest_match_index + 1 < len(data_api):
+                                before_match = data_api[oldest_match_index + 1]
+                                start_tier = before_match.get("currenttierpatched", "Inconnu")
+                                start_rr = before_match.get("ranking_in_tier", 0)
+                            else:
+                                start_tier = yesterday_matches[0].get("currenttierpatched", "Inconnu")
+                                start_rr = yesterday_matches[0].get("ranking_in_tier", 0) - yesterday_matches[0].get("mmr_change_to_last_game", 0)
+                                if start_rr < 0 or start_rr >= 100:
+                                    start_tier = "Inconnu"
+                                    start_rr = "?"
+                            
+                            start_str = f"{start_tier} {start_rr}rr" if start_tier != "Inconnu" else "Inconnu"
+                            
+                            title = f"{nom} : {'+' if total_rr > 0 else ''}{total_rr}"
+                            stats_str = f"{wins}W {losses}L" + (f" {draws}D" if draws > 0 else "") + f" ({winrate}%)"
+                            desc = f"{stats_str} | {start_str} -> {end_str}"
+                            
+                            embed.add_field(name=title, value=desc, inline=False)
+                            has_data = True
+                except Exception as e:
+                    print(f"Erreur Recap pour {nom}#{tag} : {e}")
+                    
+        if has_data:
+            embed.timestamp = datetime.datetime.now()
+            await channel.send(embed=embed)
+            
+    @daily_recap.before_loop
+    async def before_daily_recap(self):
         await self.client.wait_until_ready()
