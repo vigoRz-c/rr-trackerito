@@ -1,7 +1,7 @@
-# Documentation de Neckhurts (RR Tracker Valorant)
+# Documentation de RR Trackerito (RR Tracker Valorant)
 
 ## Introduction
-Le bot Neckhurts est un bot Discord 100% dédié au suivi des statistiques et des parties classées (Ranked Rating) sur le jeu Valorant.
+Le bot RR Trackerito est un bot Discord 100% dédié au suivi des statistiques et des parties classées (Ranked Rating) sur le jeu Valorant.
 
 ## Fonctionnalités Valorant
 

@@ -78,7 +78,7 @@ async def classement(interaction: discord.Interaction):
         title="Classement des membres",
         color=discord.Color.from_rgb(255, 180, 0)
     )
-    embed.set_author(name="Neckhurts Tracker", icon_url=VALORANT_ICON)
+    embed.set_author(name="RR Trackerito", icon_url=VALORANT_ICON)
 
     lines = []
     for i, joueur in enumerate(resultats, 1):

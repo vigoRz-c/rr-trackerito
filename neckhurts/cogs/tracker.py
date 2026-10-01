@@ -184,7 +184,7 @@ class DernieresGamesView(discord.ui.View):
                     inline=False
                 )
 
-            embed.set_footer(text="Neckhurts Tracker  •  Données via HenrikDev")
+            embed.set_footer(text="RR Trackerito  •  Données via HenrikDev")
             embed.timestamp = datetime.datetime.now()
             await interaction.followup.send(embed=embed, ephemeral=True)
 
@@ -236,7 +236,7 @@ def build_match_embed(nom, tag, rang, rr_actuel, mmr_change, diff,
     rr_label = "RR Gagnés" if is_win else "RR Perdus" if not is_draw else "RR"
     embed.add_field(name=rr_label, value=f"```{rr_display}```", inline=False)
 
-    embed.set_footer(text="Neckhurts Tracker  •  Données via HenrikDev")
+    embed.set_footer(text="RR Trackerito  •  Données via HenrikDev")
     embed.timestamp = datetime.datetime.now()
     return embed
 
@@ -481,7 +481,7 @@ class TrackerTask:
             color=discord.Color.from_rgb(160, 100, 255)
         )
         embed.set_author(
-            name="Recap Quotidien — Neckhurts Tracker",
+            name="Recap Quotidien — RR Trackerito",
             icon_url="https://media.valorant-api.com/competitivetiers/03621f52-342b-cf4e-4f86-9350a49c6d04/24/largeicon.png"
         )
 
@@ -560,7 +560,7 @@ class TrackerTask:
                     print(f"Erreur Recap pour {nom}#{tag} : {e}")
                     
         if has_data:
-            embed.set_footer(text="Neckhurts Tracker  •  Données via HenrikDev")
+            embed.set_footer(text="RR Trackerito  •  Données via HenrikDev")
             embed.timestamp = datetime.datetime.now()
 
             print("=== RÉCAPITULATIF ENVOYÉ SUR DISCORD ===")
