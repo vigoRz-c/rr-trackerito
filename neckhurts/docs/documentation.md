@@ -1,78 +1,97 @@
 # Documentation de RR Trackerito (RR Tracker Valorant)
 
 ## Introduction
-Le bot RR Trackerito est un bot Discord 100% dédié au suivi des statistiques et des parties classées (Ranked Rating) sur le jeu Valorant.
+Le bot RR Trackerito est un bot Discord 100% dedie au suivi des statistiques et des parties classees (Ranked Rating) sur le jeu Valorant.
 
-## Fonctionnalités Valorant
+## Fonctionnalites Valorant
 
-### 1. Commande `/rr` (Détails du dernier match)
-Permet de consulter ponctuellement les statistiques d'un joueur. Elle affiche le Rang, les RR actuels, mais aussi les **détails de la dernière game** (KDA, Agent, Map, Résultat).
-- **Paramètres** : `nom` (avec autocomplétion), `tag` (optionnel si le joueur est enregistré), `region` (par défaut 'eu').
-- **Utilisation** : `/rr nom:TenZ tag:000 region:na` ou juste `/rr nom:PerrierGingembre` grâce à l'autocomplétion.
+### 1. Commande /rr (Details du dernier match)
+Permet de consulter ponctuellement les statistiques d un joueur. Elle affiche le Rang, les RR actuels, mais aussi les details de la derniere game (KDA, Agent, Map, Resultat).
+- Parametres : nom (avec autocompletion), tag (optionnel si le joueur est enregistre), region (par defaut eu).
+- Utilisation : /rr nom:TenZ tag:000 region:na ou juste /rr nom:PerrierGingembre grace a l autocompletion.
 
-### 2. Tracker Automatique et Commande `/link`
-Permet d'associer un compte Discord à un compte Riot Valorant et de suivre son évolution en arrière-plan.
-- **`/link <nom> <tag> <region>`** : Lier son compte Riot.
-- **`/unlink`** : Supprimer l'association.
-- **Tâche de fond (Tracker)** : Toutes les 2 minutes, le bot vérifie si une **nouvelle partie classée** s'est terminée pour chaque compte enregistré. La détection est basée sur le **`matchid`** de la dernière partie (et non plus sur le seul changement d'ELO) : si le dernier `matchid` retourné par l'API diffère du `last_match_id` sauvegardé en local, le bot déclenche la notification. Cela garantit une détection fiable même si l'API HenrikDev tarde à mettre à jour le MMR. Le `last_match_id` est sauvegardé dans `tracker_data.json` pour éviter les doublons. Les parties non classées (spike rush, deathmatch, etc.) mettent à jour le `last_match_id` sans envoyer de notification. S'il y a une nouvelle partie détectée, le bot envoie automatiquement une **image premium générée dynamiquement** dans le salon configuré.
-  - L'image est générée en Python via `Pillow` (`utils/image_generator.py`), affichant le fond de la carte jouée, l'agent, le KDA et l'évolution du RR (en vert ou rouge) façon Tracker.gg. Les assets graphiques (splash arts et icônes) sont téléchargés de manière asynchrone en temps réel via l'API publique `valorant-api.com`.
-  - **Détection de groupe (Duo/Trio...)** : Si plusieurs joueurs du serveur participent à la même partie (même `matchid`), le bot regroupe intelligemment les résultats dans un seul et même message global pour éviter le spam du salon.
-  - Un **bouton interactif** « 🕹️ 5 dernières games » est attaché à chaque message : en cliquant dessus, le joueur reçoit un récapitulatif éphémère de ses 5 dernières parties (agent, KDA, ACS, HS%, score).
+### 2. Tracker Automatique et Commande /link
+Permet d associer un compte Discord a un compte Riot Valorant et de suivre son evolution en arriere-plan.
+- /link nom tag region : Lier son compte Riot.
+- /unlink : Supprimer l association.
+- Tache de fond (Tracker) : Toutes les 2 minutes, le bot verifie si une nouvelle partie classee s est terminee pour chaque compte enregistre. La detection est basee sur le matchid de la derniere partie : si le dernier matchid differe du last_match_id sauvegarde en local, le bot declenche la notification. Le last_match_id est sauvegarde immediatement apres detection pour eviter les doublons. Les parties non classees (spike rush, deathmatch, etc.) mettent a jour le last_match_id sans envoyer de notification.
+  - Detectection de groupe (Duo/Trio...) : Si plusieurs joueurs du serveur participent a la meme partie (meme matchid), le bot regroupe les resultats et genere une image leaderboard style Valorant via generate_group_image().
+  - Un bouton interactif 5 dernieres games est attache a chaque message.
 
-### 3. Commande `/classement` (Leaderboard)
-Affiche le classement en temps réel de tous les membres enregistrés via `/link`.
-- Le bot interroge l'API HenrikDev pour chaque joueur et trie par ELO décroissant.
-- **Rendu visuel premium** : Le classement est désormais envoyé sous forme d'**image PNG générée dynamiquement** par `utils/image_reports_generator.py` (Pillow). Le panneau affiche :
-  - En-tête sombre avec accent rouge Valorant et badge du nombre de joueurs.
-  - Colonnes **POS / JOUEUR / RANG / RR** avec icônes de rang officielles téléchargées depuis `media.valorant-api.com`.
+### 3. Commande /classement (Leaderboard)
+Affiche le classement en temps reel de tous les membres enregistres via /link.
+- Le bot interroge l API HenrikDev pour chaque joueur et trie par ELO decroissant.
+- Rendu visuel premium via utils/image_reports_generator.py (Pillow) :
+  - En-tete sombre avec accent rouge Valorant et badge du nombre de joueurs.
+  - Colonnes POS / JOUEUR / RANG / RR avec icones de rang officielles.
   - Podium (top 3) mis en valeur avec couleurs or/argent/bronze.
-  - Avatar stylisé (initiale dans un cercle coloré selon le rang) pour chaque joueur.
-  - Couleur d'accent du texte adaptée au tier (or pour Gold, cyan pour Platinum, vert pour Ascendant, etc.).
-- **Fallback** : Si la génération d'image échoue (réseau coupé, Pillow indisponible...), un embed texte paginé (15 joueurs/page) est envoyé à la place.
-- Les joueurs dont l'API est indisponible apparaissent en bas du classement avec `—`.
+  - Avatar Discord : Si le membre est present sur le serveur (guild.get_member()), sa photo de profil Discord est telechargee, decoupee en cercle parfait et affichee. Sinon, fallback sur l initiale coloree selon son rang.
+- Fallback : Si la generation d image echoue, un embed texte pagine (15 joueurs/page) est envoye.
 
-### 4. Récapitulatif Quotidien (9h00)
-- **Tâche de fond (Daily Recap)** : Tous les jours à 9h00, le bot analyse l'historique complet de la veille pour chaque joueur enregistré. Il génère un **panneau visuel premium** (image PNG) envoyé comme pièce jointe Discord.
-- Le panneau contient une **carte par joueur** avec :
-  - Avatar stylisé + Pseudo#Tag.
-  - Bilan RR en grand avec flèche haut/bas et code couleur (vert/rouge).
-  - Stats : Victoires / Défaites / Win Rate %.
-  - Progression de rang visuelle : icône rang départ -> icône rang fin + barre de progression RR (0-100).
-- **Rattrapage (Catch-up)** : Si le bot est éteint à 9h00, il mémorise son retard et enverra le récapitulatif manquant instantanément dès qu'il sera rallumé.
-- **Fallback** : Si la génération d'image échoue, un embed texte classique est envoyé.
+### 4. Recapitulatif Quotidien (9h00)
+- Tache de fond (Daily Recap) : Tous les jours a 9h00, le bot analyse l historique complet de la veille pour chaque joueur enregistre.
+- Le panneau (resolution 1600px de large, haute qualite) contient une carte par joueur avec :
+  - Avatar Discord en cercle (84px) si disponible, sinon initiale coloree.
+  - Pseudo#Tag en grand.
+  - Bilan RR en grand (police 52pt) avec fleche haut/bas et code couleur (vert/rouge).
+  - Stats : Victoires / Defaites / Win Rate %.
+  - Progression de rang visuelle : icone rang depart -> icone rang fin + barre de progression RR (0-100, 400px).
+- Les joueurs sont tries par gain de RR decroissant (meilleur joueur en haut, pire en bas).
+- Rattrapage (Catch-up) : Si le bot est eteint a 9h00, il envoie le recapitulatif manquant au redemarrage.
+- Fallback : Si la generation d image echoue, un embed texte classique est envoye.
 
-### 5. Commandes de Test (Admins)
-- **`/test_game`** : Simule artificiellement un changement d'ELO pour tester l'annonce automatique du tracker.
-- **`/test_recap`** : Force la génération et l'envoi immédiat du récapitulatif quotidien de la veille.
+### 5. Commande /test_affichage (Admin)
+Genere et envoie dans le salon courant un exemple de chaque type d affichage avec des donnees aleatoires a chaque appel :
+1. Recap solo (map, agent, KDA, score, RR aleatoires)
+2. Recap duo (joueurs et resultat aleatoires)
+3. Recap trio
+4. Recap 5-stack
+5. Recapitulatif journalier (stats aleatoires pour chaque joueur)
+6. Classement (rangs aleatoires, ordre recalcule)
 
-## Architecture & Fichiers clés
+## Architecture and Fichiers cles
 
-| Fichier | Rôle |
+| Fichier | Role |
 |---|---|
-| `cogs/tracker.py` | Tracker automatique, `/link`, `/unlink`, Daily Recap |
-| `cogs/classement.py` | Commande `/classement` |
-| `utils/image_generator.py` | Génération d'image fin de partie (fond carte + agent) |
-| `utils/image_reports_generator.py` | Génération d'image classement et recap quotidien (Pillow) |
-| `data/tracker_data.json` | Données persistantes des joueurs + métadonnées |
-
-Le projet respecte les conventions `discord.py` avec le code des commandes rangé dans le dossier `cogs/`.
+| cogs/tracker.py | Tracker automatique, /link, /unlink, Daily Recap |
+| cogs/classement.py | Commande /classement |
+| utils/image_generator.py | Generation d image fin de partie + leaderboard groupe |
+| utils/image_reports_generator.py | Generation d image classement et recap quotidien (Pillow, 1600px) |
+| data/tracker_data.json | Donnees persistantes des joueurs + metadonnees |
 
 ## Installation / Configuration
 
-1. Obtenez une clé API depuis [HenrikDev](https://dev.henrikdev.xyz/).
-2. Créez un fichier `.env` à la racine :
-```env
-DISCORD_TOKEN=votre_token_discord
-HENRIK_API_KEY=votre_cle_api_henrik
-TRACKER_CHANNEL_ID=123456789012345678 # ID du salon où le bot doit annoncer les changements de RR
-```
-3. Installez les dépendances :
-   `pip install -r requirements.txt`
-4. Lancez `neckhurts.exe` ou recompilez-le avec `pyinstaller neckhurts.spec`.
+1. Obtenez une cle API depuis HenrikDev (https://dev.henrikdev.xyz/).
+2. Creez un fichier .env a la racine :
+   DISCORD_TOKEN=votre_token_discord
+   HENRIK_API_KEY=votre_cle_api_henrik
+   TRACKER_CHANNEL_ID=123456789012345678
+3. Installez les dependances : pip install -r requirements.txt
+4. Lancez neckhurts.exe ou recompilez-le avec pyinstaller neckhurts.spec.
 
-## Dépannage (Erreurs courantes)
-- **L'exécutable se ferme instantanément** : Assurez-vous que le fichier `.env` est présent avec votre token et que le dossier `data/` a bien les droits d'écriture.
-- **PyInstaller & Fuseaux Horaires** : L'utilisation du module `zoneinfo` peut faire crasher PyInstaller sur Windows s'il n'arrive pas à compiler la base `tzdata`. Le code utilise un décalage horaire en dur (UTC+2) pour éviter ce problème.
-- **Débogage des messages Discord** : Le bot imprime en direct dans le terminal les objets JSON complets des données qu'il envoie sur Discord (tracker, récapitulatif, `/rr`). Cela permet de vérifier la validité des données avant leur affichage.
-- **Pas de salon configuré (`TRACKER_CHANNEL_ID`)** : Si aucun salon n'est défini, le bot essaiera d'envoyer les notifications de match et le récapitulatif quotidien directement en Message Privé (DM) aux utilisateurs concernés.
-- **Icônes de rang manquantes** : Les icônes sont téléchargées depuis `media.valorant-api.com` au moment de la génération. En cas d'échec réseau, le texte du rang est affiché à la place de l'icône sans planter le bot.
+## Permissions Discord requises
+
+### Privileged Gateway Intents (portail developpeur -> Bot)
+| Intent | Requis |
+|---|---|
+| Server Members Intent | OUI (avatars Discord dans les images) |
+| Message Content Intent | OUI |
+| Presence Intent | Non necessaire |
+
+### Permissions du bot (OAuth2)
+| Permission | Pourquoi |
+|---|---|
+| Voir les salons | Acceder au channel |
+| Envoyer des messages | Envoyer les recaps |
+| Integrer des liens | Embeds (recap solo) |
+| Joindre des fichiers | Images PNG generees |
+| Utiliser les commandes slash | Toutes les commandes / |
+
+Scopes OAuth2 : bot + applications.commands
+
+## Depannage (Erreurs courantes)
+- L executable se ferme instantanement : Assurez-vous que le fichier .env est present avec votre token.
+- PyInstaller and Fuseaux Horaires : Le code utilise un decalage horaire en dur (UTC+2) pour eviter les problemes zoneinfo.
+- Avatars Discord absents dans les images : Verifiez que le Server Members Intent est active dans le portail developpeur Discord ET dans le code (intents.members = True). Sans ca, guild.get_member() retourne None et le bot revient sur les initiales colorees.
+- Icones de rang manquantes : En cas d echec reseau, le texte du rang est affiche a la place de l icone.
+- Pas de salon configure (TRACKER_CHANNEL_ID) : Le bot envoie les notifications en DM aux utilisateurs concernes.

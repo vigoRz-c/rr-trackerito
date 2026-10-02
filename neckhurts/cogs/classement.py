@@ -32,6 +32,16 @@ async def classement(interaction: discord.Interaction):
             nom = info["nom"]
             tag = info["tag"]
             region = info.get("region", "eu")
+
+            # Récupération de l'avatar Discord du membre
+            avatar_url = None
+            try:
+                member = interaction.guild.get_member(int(discord_id)) if interaction.guild else None
+                if member:
+                    avatar_url = member.display_avatar.url
+            except Exception:
+                pass
+
             url = f"https://api.henrikdev.xyz/valorant/v1/mmr/{region}/{nom}/{tag}"
             try:
                 async with session.get(url, headers=headers) as resp:
@@ -41,28 +51,31 @@ async def classement(interaction: discord.Interaction):
                         rang = data.get("currenttierpatched", "Non classé")
                         rr   = data.get("ranking_in_tier", 0)
                         resultats.append({
-                            "nom":  nom,
-                            "tag":  tag,
-                            "elo":  elo,
-                            "rang": rang,
-                            "rr":   rr,
+                            "nom":               nom,
+                            "tag":               tag,
+                            "elo":               elo,
+                            "rang":              rang,
+                            "rr":                rr,
+                            "discord_avatar_url": avatar_url,
                         })
                     else:
                         resultats.append({
-                            "nom":  nom,
-                            "tag":  tag,
-                            "elo":  0,
-                            "rang": "Indisponible",
-                            "rr":   0,
+                            "nom":               nom,
+                            "tag":               tag,
+                            "elo":               0,
+                            "rang":              "Indisponible",
+                            "rr":                0,
+                            "discord_avatar_url": avatar_url,
                         })
             except Exception as e:
                 print(f"Erreur classement pour {nom}#{tag}: {e}")
                 resultats.append({
-                    "nom":  nom,
-                    "tag":  tag,
-                    "elo":  0,
-                    "rang": "Erreur",
-                    "rr":   0,
+                    "nom":               nom,
+                    "tag":               tag,
+                    "elo":               0,
+                    "rang":              "Erreur",
+                    "rr":                0,
+                    "discord_avatar_url": avatar_url,
                 })
 
     # Tri décroissant par ELO

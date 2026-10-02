@@ -51,5 +51,25 @@ Pour remplacer l'embed standard Discord par une image (façon Tracker.gg), la li
 - Erreur potentielle : Lors de la génération d'images sur différentes machines (Windows/Linux/Mac), le chargement des polices de texte (`truetype`) peut échouer. **Fix** : Le code utilise un bloc `try/except` pour tenter de charger "arialbd.ttf" ou "arial.ttf". En cas d'échec, il bascule sur `ImageFont.load_default()`.
 - Erreur réseau API : Si l'API Valorant est inaccessible, la fonction fallback silencieusement sur un fond sombre (`Image.new`) sans faire crasher le bot, garantissant l'envoi du résumé textuel dans tous les cas.
 
+18. **Remplacement de l'embed groupe par une image leaderboard Pillow** :
+L'embed texte du récapitulatif de groupe (Duo/Trio) a été remplacé par une image PNG générée dynamiquement via `generate_group_image()` dans `utils/image_generator.py`. Points clés :
+- **Hauteur dynamique** : `HEIGHT = HEADER_H + COL_HEADER_H + ROW_H * n_players + PADDING_BOT`. Si la liste est vide, `max(len, 1)` garantit au moins une ligne et évite une image de hauteur zéro.
+- **Téléchargements asynchrones** : toutes les icônes (agent + rang pour chaque joueur) + le splash de map sont récupérés en une seule passe `asyncio.gather` dans une session `aiohttp` unique, pour ne pas bloquer la boucle du bot.
+- **Compatibilité type hint `Image.Image | None`** : Cette syntaxe nécessite Python ≥ 3.10. Si la version est plus ancienne, il faut utiliser `Optional[Image.Image]` via `from typing import Optional`.
+- **Fallback** : Si `generate_group_image` lève une exception (réseau, Pillow, etc.), le `except` dans `tracker.py` récupère l'erreur et envoie un embed texte classique, sans jamais faire crasher la boucle tracker.
+- **`RANK_BANNER_URLS`** : Les URLs des icônes de rang sont déjà définies dans `tracker.py` sous forme de dict. La clé utilisée est `p_data["rang"]` (ex: `"Gold 2"`), qui doit correspondre exactement au format retourné par `currenttierpatched` de l'API HenrikDev.
+
 17. **Spam du salon lors de parties groupées (Duo/Trio)** :
 Lorsque plusieurs joueurs du serveur jouent ensemble, la boucle tracker classique envoyait un message individuel pour chaque joueur, spammant ainsi le salon Discord. **Fix** : La boucle `tracker_loop` a été remaniée. Elle vérifie d'abord toutes les parties terminées pour tous les joueurs, puis elle regroupe ces résultats par `matchid` dans un dictionnaire. Ensuite, elle traite l'envoi : si un `matchid` ne concerne qu'un joueur, un récapitulatif Premium classique est envoyé. S'il en concerne plusieurs, un message "De groupe" est généré pour éviter le spam et limiter les requêtes inutiles.
+
+19. **Avatars Discord absents dans les images generees** :
+Sans l intent members actif, guild.get_member() retournait None. Fix : ajout de intents.members = True dans neckhurts.py + activation du Server Members Intent dans le portail developpeur Discord.
+
+20. **Recap journalier trop petit (900px)** :
+Resolution trop faible, texte illisible sur Discord. Fix : refonte complete en 1600px de large. Polices, avatars (84px), icones rang (60px), cartes (200px), barres de progression (400x12px) tous mis a l echelle. LANCZOS utilise pour le redimensionnement des avatars et icones.
+
+21. **Donnees figees dans /test_affichage** :
+La commande utilisait toujours les memes donnees hardcodees. Fix : generateurs aleatoires (_rand_kda, _rand_score, _rand_stats, _rand_rr, _rand_player_entry). Chaque appel produit des maps, agents, scores, RR et rangs entierement differents.
+
+22. **Ordre non trie dans le recap journalier** :
+Les joueurs apparaissaient dans l ordre du fichier JSON. Fix : players_data.sort(key=lambda x: x.get(total_rr, 0), reverse=True) avant generation de l image. Le meilleur joueur de la journee apparait en premier.

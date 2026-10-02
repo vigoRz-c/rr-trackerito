@@ -1,12 +1,25 @@
 # -*- mode: python ; coding: utf-8 -*-
 
-
 a = Analysis(
     ['neckhurts.py'],
     pathex=[],
     binaries=[],
-    datas=[('cogs', 'cogs')],
-    hiddenimports=['discord', 'dotenv', 'aiohttp'],
+    datas=[
+        ('cogs', 'cogs'),
+        ('utils', 'utils'),
+    ],
+    hiddenimports=[
+        'discord',
+        'dotenv',
+        'aiohttp',
+        'PIL',
+        'PIL.Image',
+        'PIL.ImageDraw',
+        'PIL.ImageFont',
+        'PIL.ImageFilter',
+        'utils.image_generator',
+        'utils.image_reports_generator',
+    ],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

@@ -5,7 +5,7 @@ import aiohttp
 import os
 import json
 import datetime
-from utils.image_generator import generate_match_image
+from utils.image_generator import generate_match_image, generate_group_image
 from utils.image_reports_generator import generate_daily_recap_image
 
 os.makedirs("data", exist_ok=True)
@@ -284,6 +284,11 @@ class TrackerTask:
                                                     rang = data_api.get("currenttierpatched", "Inconnu")
                                                     current_elo = data_api.get("ranking_in_tier", last_elo % 100)
                                             
+                                            # Mise à jour immédiate du last_match_id pour éviter les doublons
+                                            # en cas d'erreur lors de la génération d'image ou de l'envoi
+                                            tracker_data[discord_id]["last_match_id"] = match_id
+                                            save_data(tracker_data)
+
                                             if match_id not in new_matches_by_id:
                                                 new_matches_by_id[match_id] = {
                                                     "match": match,
@@ -366,7 +371,7 @@ class TrackerTask:
                                 try: await user.send(embed=embed, file=file)
                                 except: pass
                                 
-                    tracker_data[discord_id]["last_match_id"] = match_id
+                    # last_match_id déjà sauvegardé lors de la détection
                     tracker_data[discord_id]["last_elo"] = player_data["current_elo"]
                     save_data(tracker_data)
                     
@@ -387,39 +392,83 @@ class TrackerTask:
                     result_text = "VICTOIRE" if is_win else "DÉFAITE" if not is_draw else "ÉGALITÉ"
                     color = discord.Color.from_rgb(0, 200, 120) if is_win else discord.Color.from_rgb(255, 60, 80) if not is_draw else discord.Color.from_rgb(120, 120, 120)
                     
-                    embed = discord.Embed(
-                        title=f"{result_text} de groupe  ·  {match_score}",
-                        description=f"Une partie groupée ({len(involved_players)} joueurs) vient de se terminer sur **{map_name}**.",
-                        color=color
-                    )
-                    
+                    # ─── Construction de la liste players_data pour generate_group_image ───
+                    nb_rounds = sum(map(int, match_score.split('-'))) if '-' in match_score else 0
+                    group_players_data = []
                     for p_data in involved_players:
-                        nom, tag = p_data["nom"], p_data["tag"]
-                        ps = extract_player_stats(all_players, nom, tag)
+                        nom_p, tag_p = p_data["nom"], p_data["tag"]
+                        ps = extract_player_stats(all_players, nom_p, tag_p)
                         if ps:
-                            agent = ps["agent"]
-                            kda = ps["kda"]
-                            sign = "+" if p_data["mmr_change"] > 0 else ""
-                            rr_str = f"{sign}{p_data['mmr_change']} RR"
-                            embed.add_field(
-                                name=f"{nom}#{tag}  —  {p_data['rang']}",
-                                value=f"**Agent**: {agent}  |  **KDA**: {kda}  |  **{rr_str}**",
-                                inline=False
-                            )
-                        
-                        tracker_data[p_data["discord_id"]]["last_match_id"] = match_id
+                            perf = round(ps.get("score_raw", 0) / nb_rounds) if nb_rounds > 0 else 0
+                            kills  = ps.get("kills", 0)
+                            deaths = ps.get("deaths", 0)
+                            kd     = round(kills / deaths, 2) if deaths > 0 else float(kills)
+                            adr    = round(ps.get("damage_made", 0) / nb_rounds) if nb_rounds > 0 else 0
+                            rank_url = RANK_BANNER_URLS.get(p_data["rang"], "")
+                            group_players_data.append({
+                                "name":      nom_p,
+                                "tag":       tag_p,
+                                "rang":      p_data["rang"],
+                                "agent_url": ps.get("agent_image") or "",
+                                "rank_url":  rank_url,
+                                "perf":      perf,
+                                "kda":       ps["kda"],
+                                "rr_change": p_data["mmr_change"],
+                                "hs_pct":    ps.get("hs_pct", 0),
+                                "kd":        kd,
+                                "adr":       adr,
+                            })
+                        # last_match_id déjà sauvegardé lors de la détection
                         tracker_data[p_data["discord_id"]]["last_elo"] = p_data["current_elo"]
                         
                     save_data(tracker_data)
-                    
-                    if channel:
-                        await channel.send(embed=embed)
-                    else:
+
+                    # ─── Génération image leaderboard groupe ─────────────────────────────
+                    try:
+                        group_buffer = await generate_group_image(
+                            players_data=group_players_data,
+                            map_name=map_name,
+                            match_score=match_score,
+                            result_text=result_text,
+                        )
+                        file = discord.File(fp=group_buffer, filename="recap_groupe.png")
+                        if channel:
+                            await channel.send(file=file)
+                        else:
+                            for p_data in involved_players:
+                                user = self.client.get_user(int(p_data["discord_id"]))
+                                if user:
+                                    try: await user.send(file=file)
+                                    except: pass
+                    except Exception as e_group:
+                        print(f"Erreur generate_group_image : {e_group}")
+                        # Fallback embed texte
+                        embed = discord.Embed(
+                            title=f"{result_text} de groupe  ·  {match_score}",
+                            description=f"Une partie groupée ({len(involved_players)} joueurs) vient de se terminer sur **{map_name}**.",
+                            color=color
+                        )
                         for p_data in involved_players:
-                            user = self.client.get_user(int(p_data["discord_id"]))
-                            if user:
-                                try: await user.send(embed=embed)
-                                except: pass
+                            nom_p, tag_p = p_data["nom"], p_data["tag"]
+                            ps = extract_player_stats(all_players, nom_p, tag_p)
+                            if ps:
+                                sign = "+" if p_data["mmr_change"] > 0 else ""
+                                rr_str = f"{sign}{p_data['mmr_change']} RR"
+                                embed.add_field(
+                                    name=f"{nom_p}#{tag_p}  —  {p_data['rang']}",
+                                    value=f"**Agent**: {ps['agent']}  |  **KDA**: {ps['kda']}  |  **{rr_str}**",
+                                    inline=False
+                                )
+                        embed.set_footer(text="RR Trackerito • Données via HenrikDev")
+                        embed.timestamp = datetime.datetime.now()
+                        if channel:
+                            await channel.send(embed=embed)
+                        else:
+                            for p_data in involved_players:
+                                user = self.client.get_user(int(p_data["discord_id"]))
+                                if user:
+                                    try: await user.send(embed=embed)
+                                    except: pass
 
         # Rattrapage du Daily Recap si on a dépassé 9h et qu'il n'a pas été envoyé aujourd'hui
         now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=2)))
@@ -483,6 +532,17 @@ class TrackerTask:
                 tag    = info["tag"]
                 region = info["region"]
 
+                # Récupération de l'avatar Discord du membre
+                avatar_url = None
+                try:
+                    for guild in self.client.guilds:
+                        member = guild.get_member(int(discord_id))
+                        if member:
+                            avatar_url = member.display_avatar.url
+                            break
+                except Exception:
+                    pass
+
                 url = f"https://api.henrikdev.xyz/valorant/v1/mmr-history/{region}/{nom}/{tag}"
                 try:
                     async with session.get(url, headers=headers) as response:
@@ -533,17 +593,18 @@ class TrackerTask:
                                     start_rr   = 0
 
                             players_data.append({
-                                "nom":        nom,
-                                "tag":        tag,
-                                "total_rr":   total_rr,
-                                "wins":       wins,
-                                "losses":     losses,
-                                "draws":      draws,
-                                "winrate":    winrate,
-                                "start_rang": start_rang,
-                                "start_rr":   start_rr,
-                                "end_rang":   end_rang,
-                                "end_rr":     end_rr,
+                                "nom":               nom,
+                                "tag":               tag,
+                                "total_rr":          total_rr,
+                                "wins":              wins,
+                                "losses":            losses,
+                                "draws":             draws,
+                                "winrate":           winrate,
+                                "start_rang":        start_rang,
+                                "start_rr":          start_rr,
+                                "end_rang":          end_rang,
+                                "end_rr":            end_rr,
+                                "discord_avatar_url": avatar_url,
                             })
                 except Exception as e:
                     print(f"Erreur Recap pour {nom}#{tag} : {e}")
@@ -554,6 +615,8 @@ class TrackerTask:
         print("=== RÉCAPITULATIF ENVOYÉ SUR DISCORD ===")
         for pd in players_data:
             print(json.dumps(pd, indent=4, ensure_ascii=False))
+
+        players_data.sort(key=lambda x: x.get("total_rr", 0), reverse=True)
 
         try:
             buf  = await generate_daily_recap_image(date_label, players_data)
