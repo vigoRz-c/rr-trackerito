@@ -6,7 +6,9 @@ a = Analysis(
     binaries=[],
     datas=[
         ('cogs', 'cogs'),
-        ('utils', 'utils'),
+        ('services', 'services'),
+        ('core', 'core'),
+        ('database', 'database'),
     ],
     hiddenimports=[
         'discord',
@@ -17,8 +19,8 @@ a = Analysis(
         'PIL.ImageDraw',
         'PIL.ImageFont',
         'PIL.ImageFilter',
-        'utils.image_generator',
-        'utils.image_reports_generator',
+        'services.api_valorant',
+        'services.image_services',
     ],
     hookspath=[],
     hooksconfig={},

@@ -1,12 +1,7 @@
 import discord
 from discord import app_commands
-import aiohttp
-import os
-import io
-from cogs.tracker import load_data
-from utils.image_reports_generator import generate_classement_image
-
-HENRIK_API_KEY = os.getenv("HENRIK_API_KEY")
+from core.config import HENRIK_API_KEY
+from services.image_services import generate_classement_image
 
 
 @app_commands.command(name="classement", description="Affiche le classement ELO de tous les membres enregistrés.")
@@ -17,66 +12,49 @@ async def classement(interaction: discord.Interaction):
         await interaction.followup.send("❌ L'API Henrik n'est pas configurée.")
         return
 
-    tracker_data = load_data()
+    tracker_data = await interaction.client.db.load_data()
     joueurs = {k: v for k, v in tracker_data.items() if k != "_meta"}
 
     if not joueurs:
         await interaction.followup.send("❌ Aucun membre enregistré. Utilise `/link` pour t'enregistrer.")
         return
 
-    headers = {"Authorization": HENRIK_API_KEY}
     resultats = []
+    from services.api_valorant import get_player_mmr
 
-    async with aiohttp.ClientSession() as session:
-        for discord_id, info in joueurs.items():
-            nom = info["nom"]
-            tag = info["tag"]
-            region = info.get("region", "eu")
+    for discord_id, info in joueurs.items():
+        nom = info["nom"]
+        tag = info["tag"]
+        region = info.get("region", "eu")
 
-            # Récupération de l'avatar Discord du membre
-            avatar_url = None
-            try:
-                member = interaction.guild.get_member(int(discord_id)) if interaction.guild else None
-                if member:
-                    avatar_url = member.display_avatar.url
-            except Exception:
-                pass
+        # Récupération de l'avatar Discord du membre
+        avatar_url = None
+        try:
+            member = interaction.guild.get_member(int(discord_id)) if interaction.guild else None
+            if member:
+                avatar_url = member.display_avatar.url
+        except Exception:
+            pass
 
-            url = f"https://api.henrikdev.xyz/valorant/v1/mmr/{region}/{nom}/{tag}"
-            try:
-                async with session.get(url, headers=headers) as resp:
-                    if resp.status == 200:
-                        data = (await resp.json()).get("data") or {}
-                        elo  = data.get("elo", 0)
-                        rang = data.get("currenttierpatched", "Non classé")
-                        rr   = data.get("ranking_in_tier", 0)
-                        resultats.append({
-                            "nom":               nom,
-                            "tag":               tag,
-                            "elo":               elo,
-                            "rang":              rang,
-                            "rr":                rr,
-                            "discord_avatar_url": avatar_url,
-                        })
-                    else:
-                        resultats.append({
-                            "nom":               nom,
-                            "tag":               tag,
-                            "elo":               0,
-                            "rang":              "Indisponible",
-                            "rr":                0,
-                            "discord_avatar_url": avatar_url,
-                        })
-            except Exception as e:
-                print(f"Erreur classement pour {nom}#{tag}: {e}")
-                resultats.append({
-                    "nom":               nom,
-                    "tag":               tag,
-                    "elo":               0,
-                    "rang":              "Erreur",
-                    "rr":                0,
-                    "discord_avatar_url": avatar_url,
-                })
+        data = await get_player_mmr(nom, tag, region)
+        if data:
+            resultats.append({
+                "nom":               nom,
+                "tag":               tag,
+                "elo":               data.get("elo", 0),
+                "rang":              data.get("currenttierpatched", "Non classé"),
+                "rr":                data.get("ranking_in_tier", 0),
+                "discord_avatar_url": avatar_url,
+            })
+        else:
+            resultats.append({
+                "nom":               nom,
+                "tag":               tag,
+                "elo":               0,
+                "rang":              "Indisponible",
+                "rr":                0,
+                "discord_avatar_url": avatar_url,
+            })
 
     # Tri décroissant par ELO
     resultats.sort(key=lambda x: x["elo"], reverse=True)

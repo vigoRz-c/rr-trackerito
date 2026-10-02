@@ -1,12 +1,10 @@
 import discord
 from discord import app_commands
 from discord.ext import tasks
-import aiohttp
 import os
 import json
 import datetime
-from utils.image_generator import generate_match_image, generate_group_image
-from utils.image_reports_generator import generate_daily_recap_image
+from services.image_services import generate_match_image, generate_group_image, generate_daily_recap_image
 
 os.makedirs("data", exist_ok=True)
 DATA_FILE = "data/tracker_data.json"
@@ -43,121 +41,6 @@ RANK_BANNER_URLS = {
 
 VALORANT_ICON = "https://media.valorant-api.com/gamemodes/96bd3920-4f36-d026-2b28-c683eb0bcac5/displayicon.png"
 
-# Charger les donnees ou creer un dico vide
-def load_data():
-    if not os.path.exists(DATA_FILE):
-        return {}
-    try:
-        with open(DATA_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except:
-        return {}
-
-def save_data(data):
-    with open(DATA_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=4)
-
-
-# ─── Extraction des stats depuis un match player ─────────────────────────────
-def extract_player_stats(all_players, nom, tag):
-    """Retourne un dict de stats enrichies pour le joueur trouvé."""
-    for p in all_players:
-        if p.get("name", "").lower() == nom.lower() and p.get("tag", "").lower() == tag.lower():
-            stats = p.get("stats") or {}
-            p_assets = p.get("assets") or {}
-            p_agent_assets = p_assets.get("agent") or {}
-
-            kills = stats.get("kills", 0)
-            deaths = stats.get("deaths", 0)
-            assists = stats.get("assists", 0)
-            score = stats.get("score", 0)
-
-            headshots = stats.get("headshots", 0)
-            bodyshots = stats.get("bodyshots", 0)
-            legshots = stats.get("legshots", 0)
-            total_shots = headshots + bodyshots + legshots
-            hs_pct = round((headshots / total_shots) * 100, 1) if total_shots > 0 else 0.0
-
-            damage_made = p.get("damage_made", 0)
-            
-            return {
-                "agent": p.get("character", "Inconnu"),
-                "kda": f"{kills}/{deaths}/{assists}",
-                "score_raw": score,
-                "hs_pct": hs_pct,
-                "team": p.get("team"),
-                "agent_image": p_agent_assets.get("small"),
-                "kills": kills,
-                "deaths": deaths,
-                "assists": assists,
-                "damage_made": damage_made,
-            }
-    return None
-
-
-def compute_acs(score_raw, total_rounds):
-    """Calcule l'ACS (Average Combat Score) à partir du score brut et du nombre de rounds."""
-    if total_rounds > 0:
-        return round(score_raw / total_rounds)
-    return 0
-
-
-def rank_emoji(rang: str) -> str:
-    rang_lower = rang.lower() if rang else ""
-    if "iron" in rang_lower:       return "🪨"
-    if "bronze" in rang_lower:     return "🥉"
-    if "silver" in rang_lower:     return "🥈"
-    if "gold" in rang_lower:       return "🥇"
-    if "platinum" in rang_lower:   return "💠"
-    if "diamond" in rang_lower:    return "💎"
-    if "ascendant" in rang_lower:  return "🌿"
-    if "immortal" in rang_lower:   return "🔴"
-    if "radiant" in rang_lower:    return "✨"
-    return "🎮"
-
-
-# ─── Vue "5 dernières games" ─────────────────────────────────────────────────
-# ─── Barre de progression RR ─────────────────────────────────────────────────
-def rr_progress_bar(rr: int, total: int = 100, length: int = 12) -> str:
-    """Génère une barre de progression ASCII pour les RR."""
-    rr = max(0, min(rr, total))
-    filled = round((rr / total) * length)
-    bar = "█" * filled + "░" * (length - filled)
-    return f"`{bar}` {rr}/{total}"
-
-
-# ─── Construction de l'embed premium après une partie ─────────────────────────
-def build_match_embed(nom, tag, rang, mmr_change, current_elo):
-    # On utilise mmr_change (changement RR de la dernière game) et non diff
-    is_win = mmr_change > 0
-    is_draw = mmr_change == 0   
-    result_text = "VICTOIRE" if is_win else "DÉFAITE" if not is_draw else "EGALITE"
-    color = discord.Color.from_rgb(0, 200, 120) if is_win else discord.Color.from_rgb(255, 60, 80) if not is_draw else discord.Color.from_rgb(120, 120, 120)
-
-    if mmr_change > 0:
-        desc = f"▶ {nom} a gagné {mmr_change} RR ({rang} {current_elo} RR)"
-    elif mmr_change < 0:
-        desc = f"▶ {nom} a perdu {abs(mmr_change)} RR ({rang} {current_elo} RR)"
-    else:
-        desc = f"▶ {nom} n'a gagné aucun RR ({rang} {current_elo} RR)"
-
-    embed = discord.Embed(
-        title=f"{result_text}",
-        description=desc,
-        color=color
-    )
-    embed.set_author(
-        name=f"{nom}#{tag} — {rang}",
-        icon_url=VALORANT_ICON
-    )
-
-    embed.set_image(url="attachment://recap.png")
-    embed.set_footer(text="RR Trackerito • Données via HenrikDev")
-    embed.timestamp = datetime.datetime.now()
-    return embed
-
-
-
 @app_commands.command(name="link", description="Associe ton compte Discord a un compte Valorant pour le tracker.")
 @app_commands.describe(nom="Ton pseudo Valorant", tag="Ton tag (sans le #)", region="Ta region (eu, na...)")
 async def link(interaction: discord.Interaction, nom: str, tag: str, region: str = "eu"):
@@ -167,47 +50,42 @@ async def link(interaction: discord.Interaction, nom: str, tag: str, region: str
         await interaction.followup.send("❌ L'API Henrik n'est pas configuree.")
         return
 
-    headers = {"Authorization": HENRIK_API_KEY}
-    url = f"https://api.henrikdev.xyz/valorant/v1/mmr/{region}/{nom}/{tag}"
+    from services.api_valorant import get_player_mmr
+    data_api = await get_player_mmr(nom, tag, region)
 
-    async with aiohttp.ClientSession() as session:
-        async with session.get(url, headers=headers) as response:
-            if response.status == 200:
-                resp_json = await response.json()
-                data_api = resp_json.get("data")
-                if not data_api:
-                    await interaction.followup.send("❌ Pas de donnees MMR trouvees (joue tes parties de placement).")
-                    return
-                
-                elo = data_api.get("elo", 0)
-                
-                # Sauvegarder dans le json
-                tracker_data = load_data()
-                discord_id = str(interaction.user.id)
-                
-                tracker_data[discord_id] = {
-                    "nom": nom,
-                    "tag": tag,
-                    "region": region,
-                    "last_elo": elo
-                }
-                
-                save_data(tracker_data)
-                
-                await interaction.followup.send(f"✅ Compte {nom}#{tag} lié avec succès ! Le bot t'annoncera tes futurs gains/pertes de RR.")
-                
-            elif response.status == 404:
-                await interaction.followup.send("❌ Compte introuvable.")
-            else:
-                await interaction.followup.send(f"❌ Erreur API ({response.status}).")
+    if data_api is None:
+        await interaction.followup.send("❌ Compte introuvable ou erreur API.")
+        return
+    if not data_api:
+        await interaction.followup.send("❌ Pas de donnees MMR trouvees (joue tes parties de placement).")
+        return
+        
+    elo = data_api.get("elo", 0)
+    
+    # Sauvegarder dans le json
+    tracker_data = await interaction.client.db.load_data()
+    discord_id = str(interaction.user.id)
+    
+    tracker_data[discord_id] = {
+        "nom": nom,
+        "tag": tag,
+        "region": region,
+        "last_elo": elo
+    }
+    
+    await interaction.client.db.save_data(tracker_data)
+    
+    await interaction.followup.send(f"✅ Compte {nom}#{tag} lié avec succès ! Le bot t'annoncera tes futurs gains/pertes de RR.")
+    
+
 
 @app_commands.command(name="unlink", description="Supprime l'association entre ton compte Discord et Valorant.")
 async def unlink(interaction: discord.Interaction):
-    tracker_data = load_data()
+    tracker_data = await interaction.client.db.load_data()
     discord_id = str(interaction.user.id)
     if discord_id in tracker_data:
         del tracker_data[discord_id]
-        save_data(tracker_data)
+        await interaction.client.db.save_data(tracker_data)
         await interaction.response.send_message("✅ Ton compte Valorant n'est plus suivi.")
     else:
         await interaction.response.send_message("❌ Tu n'avais aucun compte enregistré.")
@@ -229,7 +107,7 @@ class TrackerTask:
         if not HENRIK_API_KEY:
             return
 
-        tracker_data = load_data()
+        tracker_data = await self.client.db.load_data()
         if not tracker_data:
             return
 
@@ -240,75 +118,65 @@ class TrackerTask:
             except:
                 pass
 
-        headers = {"Authorization": HENRIK_API_KEY}
+        from services.api_valorant import get_latest_match, get_player_mmr
+        new_matches_by_id = {}
+        
+        for discord_id, info in tracker_data.items():
+            if discord_id == "_meta":
+                continue
+            nom = info["nom"]
+            tag = info["tag"]
+            region = info["region"]
+            last_match_id = info.get("last_match_id")
+            last_elo = info.get("last_elo", 0)
 
-        async with aiohttp.ClientSession() as session:
-            new_matches_by_id = {}
-            
-            for discord_id, info in tracker_data.items():
-                if discord_id == "_meta":
-                    continue
-                nom = info["nom"]
-                tag = info["tag"]
-                region = info["region"]
-                last_match_id = info.get("last_match_id")
-                last_elo = info.get("last_elo", 0)
+            match_data = await get_latest_match(nom, tag, region)
+            if match_data and len(match_data) > 0:
+                match = match_data[0]
+                metadata = match.get("metadata") or {}
+                match_id = metadata.get("matchid")
+                
+                if match_id:
+                    if last_match_id is None:
+                        tracker_data[discord_id]["last_match_id"] = match_id
+                        await self.client.db.save_data(tracker_data)
+                    elif match_id != last_match_id:
+                        mode = metadata.get("mode", "").lower()
+                        queue = metadata.get("queue", "").lower()
+                        if mode == "competitive" or queue == "competitive":
+                            mmr_change = 0
+                            rang = "Inconnu"
+                            current_elo = last_elo
+                            
+                            data_api = await get_player_mmr(nom, tag, region)
+                            if data_api:
+                                mmr_change = data_api.get("mmr_change_to_last_game", 0)
+                                rang = data_api.get("currenttierpatched", "Inconnu")
+                                current_elo = data_api.get("ranking_in_tier", last_elo % 100)
+                                            
+                            # Mise à jour immédiate du last_match_id pour éviter les doublons
+                            # en cas d'erreur lors de la génération d'image ou de l'envoi
+                            tracker_data[discord_id]["last_match_id"] = match_id
+                            await self.client.db.save_data(tracker_data)
 
-                match_url = f"https://api.henrikdev.xyz/valorant/v3/matches/{region}/{nom}/{tag}?size=1"
-                try:
-                    async with session.get(match_url, headers=headers) as match_resp:
-                        if match_resp.status == 200:
-                            match_data = await match_resp.json()
-                            if match_data.get("data") and len(match_data["data"]) > 0:
-                                match = match_data["data"][0]
-                                metadata = match.get("metadata") or {}
-                                match_id = metadata.get("matchid")
+                            if match_id not in new_matches_by_id:
+                                new_matches_by_id[match_id] = {
+                                    "match": match,
+                                    "players": []
+                                }
                                 
-                                if match_id:
-                                    if last_match_id is None:
-                                        tracker_data[discord_id]["last_match_id"] = match_id
-                                        save_data(tracker_data)
-                                    elif match_id != last_match_id:
-                                        mode = metadata.get("mode", "").lower()
-                                        queue = metadata.get("queue", "").lower()
-                                        if mode == "competitive" or queue == "competitive":
-                                            mmr_url = f"https://api.henrikdev.xyz/valorant/v1/mmr/{region}/{nom}/{tag}"
-                                            mmr_change = 0
-                                            rang = "Inconnu"
-                                            current_elo = last_elo
-                                            
-                                            async with session.get(mmr_url, headers=headers) as mmr_resp:
-                                                if mmr_resp.status == 200:
-                                                    data_api = (await mmr_resp.json()).get("data", {})
-                                                    mmr_change = data_api.get("mmr_change_to_last_game", 0)
-                                                    rang = data_api.get("currenttierpatched", "Inconnu")
-                                                    current_elo = data_api.get("ranking_in_tier", last_elo % 100)
-                                            
-                                            # Mise à jour immédiate du last_match_id pour éviter les doublons
-                                            # en cas d'erreur lors de la génération d'image ou de l'envoi
-                                            tracker_data[discord_id]["last_match_id"] = match_id
-                                            save_data(tracker_data)
-
-                                            if match_id not in new_matches_by_id:
-                                                new_matches_by_id[match_id] = {
-                                                    "match": match,
-                                                    "players": []
-                                                }
-                                                
-                                            new_matches_by_id[match_id]["players"].append({
-                                                "discord_id": discord_id,
-                                                "nom": nom,
-                                                "tag": tag,
-                                                "region": region,
-                                                "mmr_change": mmr_change,
-                                                "rang": rang,
-                                                "current_elo": current_elo
-                                            })
-                                        else:
-                                            tracker_data[discord_id]["last_match_id"] = match_id
-                                            save_data(tracker_data)
-                except Exception as e:
-                    print(f"Erreur vérification match pour {nom}#{tag} : {e}")
+                            new_matches_by_id[match_id]["players"].append({
+                                "discord_id": discord_id,
+                                "nom": nom,
+                                "tag": tag,
+                                "region": region,
+                                "mmr_change": mmr_change,
+                                "rang": rang,
+                                "current_elo": current_elo
+                            })
+                        else:
+                            tracker_data[discord_id]["last_match_id"] = match_id
+                            await self.client.db.save_data(tracker_data)
 
             for match_id, match_info in new_matches_by_id.items():
                 match = match_info["match"]
@@ -373,7 +241,7 @@ class TrackerTask:
                                 
                     # last_match_id déjà sauvegardé lors de la détection
                     tracker_data[discord_id]["last_elo"] = player_data["current_elo"]
-                    save_data(tracker_data)
+                    await self.client.db.save_data(tracker_data)
                     
                 else:
                     p1_stats = extract_player_stats(all_players, involved_players[0]["nom"], involved_players[0]["tag"])
@@ -421,7 +289,7 @@ class TrackerTask:
                         # last_match_id déjà sauvegardé lors de la détection
                         tracker_data[p_data["discord_id"]]["last_elo"] = p_data["current_elo"]
                         
-                    save_data(tracker_data)
+                    await self.client.db.save_data(tracker_data)
 
                     # ─── Génération image leaderboard groupe ─────────────────────────────
                     try:
@@ -479,7 +347,7 @@ class TrackerTask:
                 await self.execute_daily_recap()
                 meta["last_daily_recap"] = today_str
                 tracker_data["_meta"] = meta
-                save_data(tracker_data)
+                await self.client.db.save_data(tracker_data)
 
     @tracker_loop.before_loop
     async def before_tracker_loop(self):
@@ -488,12 +356,12 @@ class TrackerTask:
     @tasks.loop(time=datetime.time(hour=9, minute=0, tzinfo=datetime.timezone(datetime.timedelta(hours=2))))
     async def daily_recap(self):
         # Marquer comme envoye
-        tracker_data = load_data()
+        tracker_data = await self.client.db.load_data()
         now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=2)))
         meta = tracker_data.get("_meta", {})
         meta["last_daily_recap"] = now.strftime("%Y-%m-%d")
         tracker_data["_meta"] = meta
-        save_data(tracker_data)
+        await self.client.db.save_data(tracker_data)
         
         await self.execute_daily_recap()
         
@@ -501,7 +369,7 @@ class TrackerTask:
         if not HENRIK_API_KEY:
             return
 
-        tracker_data = load_data()
+        tracker_data = await self.client.db.load_data()
         if not tracker_data:
             return
 
@@ -524,30 +392,27 @@ class TrackerTask:
         date_label  = yesterday.strftime("%d/%m/%Y")
         players_data = []
 
-        async with aiohttp.ClientSession() as session:
-            for discord_id, info in tracker_data.items():
-                if discord_id == "_meta":
-                    continue
-                nom    = info["nom"]
-                tag    = info["tag"]
-                region = info["region"]
+        from services.api_valorant import get_mmr_history
+        for discord_id, info in tracker_data.items():
+            if discord_id == "_meta":
+                continue
+            nom    = info["nom"]
+            tag    = info["tag"]
+            region = info["region"]
 
-                # Récupération de l'avatar Discord du membre
-                avatar_url = None
-                try:
-                    for guild in self.client.guilds:
-                        member = guild.get_member(int(discord_id))
-                        if member:
-                            avatar_url = member.display_avatar.url
-                            break
-                except Exception:
-                    pass
+            # Récupération de l'avatar Discord du membre
+            avatar_url = None
+            try:
+                for guild in self.client.guilds:
+                    member = guild.get_member(int(discord_id))
+                    if member:
+                        avatar_url = member.display_avatar.url
+                        break
+            except Exception:
+                pass
 
-                url = f"https://api.henrikdev.xyz/valorant/v1/mmr-history/{region}/{nom}/{tag}"
-                try:
-                    async with session.get(url, headers=headers) as response:
-                        if response.status == 200:
-                            data_api = (await response.json()).get("data", [])
+            data_api = await get_mmr_history(nom, tag, region)
+            if data_api is not None:
 
                             yesterday_matches = [
                                 m for m in data_api
@@ -606,8 +471,6 @@ class TrackerTask:
                                 "end_rr":            end_rr,
                                 "discord_avatar_url": avatar_url,
                             })
-                except Exception as e:
-                    print(f"Erreur Recap pour {nom}#{tag} : {e}")
 
         if not players_data:
             return

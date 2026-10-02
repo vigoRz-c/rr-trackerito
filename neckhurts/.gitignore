@@ -5,3 +5,4 @@ dist/
 *.pyc
 tracker_data.json
 neckhurts.exe
+bot.log

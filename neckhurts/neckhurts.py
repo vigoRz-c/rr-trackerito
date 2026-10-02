@@ -11,17 +11,15 @@ import discord
 from dotenv import load_dotenv
 from discord import app_commands
 
-# ========== CONFIGURATION & VARIABLES ==========
-load_dotenv()
-TOKEN = os.getenv("DISCORD_TOKEN")
+# -- IMPORTS DES NOUVEAUX MODULES --
+from core.config import TOKEN
+from core.logger import log
+from database.data_manager import DataManager
 
-from cogs.tracker import link, unlink, TrackerTask, load_data, save_data
-from utils.image_generator import generate_match_image, generate_group_image
-from utils.image_reports_generator import generate_daily_recap_image, generate_classement_image
+from cogs.tracker import link, unlink, TrackerTask
+from services.image_services import generate_match_image, generate_group_image, generate_daily_recap_image, generate_classement_image
 from cogs.tracker import RANK_BANNER_URLS
 from cogs.classement import classement
-if not TOKEN:
-    raise ValueError("❌ Le token Discord n'a pas été trouvé dans la variable d'environnement DISCORD_TOKEN")
 
 
 # ========== BOT DISCORD ==========
@@ -33,16 +31,30 @@ class MyClient(discord.Client):
     def __init__(self, *, intents):
         super().__init__(intents=intents)
         self.tree = app_commands.CommandTree(self)
+        
+        # INJECTION DE LA BDD DANS LE CLIENT
+        os.makedirs("data", exist_ok=True)
+        self.db = DataManager("data/tracker_data.json")
 
     async def setup_hook(self):
         self.tracker_task = TrackerTask(self)
+        
+        # -- GESTIONNAIRE D'ERREURS GLOBAL --
+        async def on_tree_error(interaction: discord.Interaction, error: app_commands.AppCommandError):
+            log.error(f"[Slash Command Error] {interaction.command.name if interaction.command else 'Unknown'} : {error}", exc_info=error)
+            try:
+                if not interaction.response.is_done():
+                    await interaction.response.send_message("❌ Une erreur interne est survenue.", ephemeral=True)
+                else:
+                    await interaction.followup.send("❌ Une erreur interne est survenue.", ephemeral=True)
+            except Exception as fallback_err:
+                log.error(f"Impossible d'envoyer le message d'erreur : {fallback_err}")
+                
+        self.tree.on_error = on_tree_error
         await self.tree.sync()
 
     async def on_ready(self):
-        print(f"[SUCCESS] Connecté en tant que {self.user}")
-
-
-
+        log.info(f"Connecté avec succès en tant que {self.user}")
 client = MyClient(intents=intents)
 
 # ========== COMMANDES SLASH ==========

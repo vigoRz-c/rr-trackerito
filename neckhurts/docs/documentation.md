@@ -95,3 +95,42 @@ Scopes OAuth2 : bot + applications.commands
 - Avatars Discord absents dans les images : Verifiez que le Server Members Intent est active dans le portail developpeur Discord ET dans le code (intents.members = True). Sans ca, guild.get_member() retourne None et le bot revient sur les initiales colorees.
 - Icones de rang manquantes : En cas d echec reseau, le texte du rang est affiche a la place de l icone.
 - Pas de salon configure (TRACKER_CHANNEL_ID) : Le bot envoie les notifications en DM aux utilisateurs concernes.
+
+## Phase 3 et 4 : Refonte Finale (Services Purs)
+Afin de rendre le bot encore plus modulaire et testable, nous avons :
+1. Centralisé tous les appels HTTP vers l\'API HenrikDev dans le module services/api_valorant.py.
+2. Extrait toute la génération d\'images (Pillow) dans le module services/image_services.py sans dépendance directe à aiohttp (fonctions pures).
+3. Les Cogs (	racker.py et classement.py) ne font plus de requêtes HTTP directes.
+4. L\'ancien dossier utils/ a été supprimé pour concentrer toute la logique métier dans services/.
+
+## Déploiement sur Raspberry Pi / Linux
+
+Pour assurer que le bot tourne 24/7 sur un serveur Linux (ex: Raspberry Pi) de manière robuste, nous utilisons `systemd`.
+Un fichier modèle `neckhurts.service` est disponible dans le dossier `scripts/linux/`.
+
+### Installation et configuration
+
+1. Editez le fichier `scripts/linux/neckhurts.service` si besoin pour vérifier le `User` et `WorkingDirectory` correspondants à votre installation.
+2. Copiez le service dans le répertoire de systemd :
+   `ash
+   sudo cp scripts/linux/neckhurts.service /etc/systemd/system/
+   `
+3. Rechargez le daemon systemd pour qu'il prenne en compte le nouveau service :
+   `ash
+   sudo systemctl daemon-reload
+   `
+4. Activez le service au démarrage de la machine :
+   `ash
+   sudo systemctl enable neckhurts.service
+   `
+5. Démarrez le bot :
+   `ash
+   sudo systemctl start neckhurts.service
+   `
+
+### Commandes utiles (Logs et Maintenance)
+
+- **Vérifier le statut du bot :** `sudo systemctl status neckhurts.service`
+- **Voir les logs en temps réel :** `sudo journalctl -u neckhurts.service -f`
+- **Redémarrer le bot manuellement :** `sudo systemctl restart neckhurts.service`
+
