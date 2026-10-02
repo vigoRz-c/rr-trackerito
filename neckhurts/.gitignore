@@ -1,8 +1,0 @@
-.env
-__pycache__/
-build/
-dist/
-*.pyc
-tracker_data.json
-neckhurts.exe
-bot.log
